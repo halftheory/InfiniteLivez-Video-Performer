@@ -63,6 +63,27 @@ function cmd_tmux()
 	return 0
 }
 
+function delete_macos_system_files()
+{
+	# DIR [SUDO]
+	if [ -z "$1" ]; then
+		return 1
+	fi
+	STR_TEST="$(get_realpath "$1")"
+	if [ ! -d "$STR_TEST" ]; then
+		return 1
+	fi
+	STR_SUDO=""
+	if [ $2 ] && [ "$2" = "sudo" ]; then
+		STR_SUDO="$(maybe_sudo)"
+	fi
+	${STR_SUDO}find $STR_TEST -type f -name "._*" -delete
+	${STR_SUDO}find $STR_TEST -type f -name "*DS_Store*" -delete
+	${STR_SUDO}find $STR_TEST -type d -name ".fseventsd" | while read STR_FILE; do ${STR_SUDO}rm -Rf $STR_FILE; done
+	${STR_SUDO}find $STR_TEST -type d -name ".Spotlight-V100" | while read STR_FILE; do ${STR_SUDO}rm -Rf $STR_FILE; done
+	return 0
+}
+
 function dir_has_files()
 {
 	# DIR
@@ -751,7 +772,7 @@ function is_which()
 	return 0
 }
 
-function maybe_install()
+function maybe_apt_install()
 {
 	# APP [PACKAGE] [EXIT]
 	if [ -z $1 ]; then
@@ -769,27 +790,56 @@ function maybe_install()
 	if [ $3 ] && [ "$3" = "exit" ]; then
 		BOOL_EXIT=true
 	fi
-    if [ "$(get_system)" = "Darwin" ]; then
-    	if is_which "brew"; then
-    		brew install $MY_PACKAGE
-    		sleep 1
-    	fi
-    else
+    if [ ! "$(get_system)" = "Darwin" ]; then
     	CMD_TEST="$(maybe_sudo)apt list --installed 2>&1 | grep \"$MY_PACKAGE/\""
 		CMD_TEST="$(eval "$CMD_TEST")"
     	if [ "$CMD_TEST" = "" ]; then
 			$(maybe_sudo)apt-get -y install $MY_PACKAGE
 			sleep 1
+			if ! is_which "$MY_APP"; then
+				if [ $BOOL_EXIT = true ]; then
+					echo "Error in $0 on line $LINENO. Exiting..."
+					exit 1
+				fi
+				return 1
+			fi
+			return 0
 		fi
 	fi
-	if ! is_which "$MY_APP"; then
-		if [ $BOOL_EXIT = true ]; then
-			echo "Error in $0 on line $LINENO. Exiting..."
-			exit 1
-		fi
+	return 1
+}
+
+function maybe_brew_install()
+{
+	# APP [PACKAGE] [EXIT]
+	if [ -z $1 ]; then
 		return 1
 	fi
-	return 0
+	MY_APP="$1"
+	if is_which "$MY_APP"; then
+		return 0
+	fi
+	MY_PACKAGE="$1"
+	if [ $2 ]; then
+		MY_PACKAGE="$2"
+	fi
+	BOOL_EXIT=false
+	if [ $3 ] && [ "$3" = "exit" ]; then
+		BOOL_EXIT=true
+	fi
+    if [ "$(get_system)" = "Darwin" ] && is_which "brew"; then
+		brew install $MY_PACKAGE
+		sleep 1
+		if ! is_which "$MY_APP"; then
+			if [ $BOOL_EXIT = true ]; then
+				echo "Error in $0 on line $LINENO. Exiting..."
+				exit 1
+			fi
+			return 1
+		fi
+		return 0
+	fi
+	return 1
 }
 
 function maybe_sshpass()
