@@ -34,12 +34,20 @@ elif [ "$1" = "-uninstall" ]; then
 	fi
 fi
 
+# requirements
 if ! is_which "amidi"; then
+	echo "> 'amidi' not found. Maybe you need to install it."
 	exit 1
 fi
+if [ ! -d "$DIR_DATA" ]; then
+	mkdir -p $DIR_DATA
+	chmod $CHMOD_DIRS $DIR_DATA
+fi
+
+# vars
+BOOL_CMD=false
 
 # functions
-
 function get_midi_port()
 {
 	STR_TEST="$(amidi -l | head -2)"
@@ -68,9 +76,11 @@ function mididump_start()
     fi
 	if is_process_running "amidi"; then
 		mididump_stop
+	else
+		echo > $FILE_MIDIDUMP
 	fi
-	echo > $FILE_MIDIDUMP
 	amidi -p $1 -d 2>&1 | grep --line-buffered " 01" | tee $FILE_MIDIDUMP
+	BOOL_CMD=true
 	return 0
 }
 
@@ -78,39 +88,28 @@ function mididump_stop()
 {
 	${MAYBE_SUDO}killall amidi > /dev/null 2>&1
 	echo > $FILE_MIDIDUMP
+	BOOL_CMD=false
 	return 0
 }
 
 STR_MIDIPORT=""
 STR_MIDIPORT_NEW=""
-BOOL_CMD=false
-
 while true; do
-	sleep 5
-
+	STR_MIDIPORT_NEW="$(get_midi_port)"
 	if [ $BOOL_CMD = false ]; then
-		STR_MIDIPORT_NEW="$(get_midi_port)"
 		if [ ! "$STR_MIDIPORT_NEW" = "" ]; then
 			STR_MIDIPORT="$STR_MIDIPORT_NEW"
 			mididump_start "$STR_MIDIPORT"
-			BOOL_CMD=true
-			continue
 		fi
-	fi
-
-	if [ $BOOL_CMD = true ]; then
-		STR_MIDIPORT_NEW="$(get_midi_port)"
+	elif [ $BOOL_CMD = true ]; then
 		if [ "$STR_MIDIPORT_NEW" = "" ]; then
 			mididump_stop
-			BOOL_CMD=false
-			continue
 		elif [ ! "$STR_MIDIPORT_NEW" = "$STR_MIDIPORT" ]; then
 			STR_MIDIPORT="$STR_MIDIPORT_NEW"
 			mididump_start "$STR_MIDIPORT"
-			continue
 		fi
 	fi
-
+	sleep 5
 done
 
 mididump_stop
