@@ -182,7 +182,11 @@ function file_add_line()
 	if [ $4 ]; then
 		${STR_SUDO}cp -f $1 $1.bak > /dev/null 2>&1
 	fi
-	echo "$2" | ${STR_SUDO}tee -a $1 > /dev/null 2>&1
+	if [ "$(tail -c1 $1)" = "" ]; then
+		echo "$2" | ${STR_SUDO}tee -a $1 > /dev/null 2>&1
+	else
+		${STR_SUDO}printf "\n$2" >> $1
+	fi
 	return 0
 }
 
@@ -616,9 +620,9 @@ function get_pidof()
 		return 1
 	fi
 	if is_which "pidof"; then
-		echo "$(pidof "$1")"
+		echo "$(pidof "$1" | awk '{print $1}')"
 	else
-		echo "$(ps -A | grep "$1" | awk '{print $1}')"
+		echo "$(ps -A | grep "$1" | grep -v "grep $1" | awk '{print $1}')"
 	fi
 	return 0
 }

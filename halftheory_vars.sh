@@ -15,21 +15,20 @@ else
 fi
 
 # vars
-DIRNAME="$(get_realpath "$DIRNAME")"
-DIR_DATA="$DIRNAME/data"
-APP_MIDIDUMP="$DIRNAME/mididump.sh"
-FILE_MIDIDUMP="$DIR_DATA/mididump.txt"
-
 MAYBE_SUDO="$(maybe_sudo)"
 OWN_LOCAL="$(whoami)"
 GRP_LOCAL="$(get_file_grp "$0")"
 DIR_LOCAL="$(get_user_dir "$OWN_LOCAL")"
 CHMOD_DIRS="755"
 CHMOD_FILES="644"
-CHMOD_UPLOADS="777"
 DIR_SCRIPTS="/usr/local/bin"
 
-if [ ! -d "$DIR_DATA" ]; then
-	mkdir -p $DIR_DATA
-	chmod $CHMOD_DIRS $DIR_DATA
-fi
+DIRNAME="$(get_realpath "$DIRNAME")"
+DIR_DATA="$DIRNAME/data"
+DIR_MEDIA="$DIR_DATA/media"
+SH_MIDIDUMP="$DIRNAME/mididump.sh"
+FILE_BEAT="$DIR_DATA/beat.txt"
+FILE_MIDIDUMP="$DIR_DATA/mididump.txt"
+FILE_PLACEHOLDER="$DIR_DATA/placeholder"
+FILE_PLAYLIST="$DIR_DATA/playlist.txt"
+FILE_SETTINGS="$DIR_DATA/settings.txt"
