@@ -46,7 +46,7 @@ function scripts_uninstall()
 if [ -d "$DIRNAME/.git" ]; then
 	if maybe_apt_install "git"; then
 		scripts_uninstall
-		(cd $DIRNAME && git fetch && git pull)
+		(cd "$DIRNAME" && git fetch && git pull)
 		if scripts_install; then
 			echo "> Updated."
 			exit 0
@@ -63,15 +63,15 @@ if maybe_apt_install "wget"; then
 	wget -q https://github.com/halftheory/$STR_REPO/archive/refs/heads/main.zip
 	if [ $? -eq 0 ] && [ -f "main.zip" ]; then
 		if is_which "unzip"; then
-			unzip -oq main.zip -d $DIRNAME
+			unzip -oq main.zip -d "$DIRNAME"
 		else
-			tar vxfz main.zip -C $DIRNAME
+			tar vxfz main.zip -C "$DIRNAME"
 		fi
 		if [ -d "$DIRNAME/$STR_REPO-main" ]; then
-			chmod $CHMOD_DIRS $DIRNAME/$STR_REPO-main
+			chmod $CHMOD_DIRS "$DIRNAME/$STR_REPO-main"
 			scripts_uninstall
-			cp -Rf $DIRNAME/$STR_REPO-main/* $DIRNAME/
-			rm -Rf $DIRNAME/$STR_REPO-main > /dev/null 2>&1
+			cp -Rf "$DIRNAME/$STR_REPO-main/*" "$DIRNAME/"
+			rm -Rf "$DIRNAME/$STR_REPO-main" > /dev/null 2>&1
 			if scripts_install; then
 				echo "> Updated."
 			fi

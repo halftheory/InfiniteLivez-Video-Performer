@@ -53,7 +53,7 @@ function cmd_tmux()
 	fi
 	STR_SESSION=""
 	if [ $2 ]; then
-		STR_SESSION=" -s $2"
+		STR_SESSION=" -s ${2%%.*}"
 	fi
 	STR_SUDO=""
 	if [ $3 ] && [ "$3" = "sudo" ]; then
@@ -77,8 +77,8 @@ function delete_macos_system_files()
 	if [ $2 ] && [ "$2" = "sudo" ]; then
 		STR_SUDO="$(maybe_sudo)"
 	fi
-	${STR_SUDO}find $STR_TEST -type f -name "._*" -o -name "*DS_Store*" -delete
-	${STR_SUDO}find $STR_TEST -type d -name ".fseventsd" -o -name ".Spotlight-V100" | while read STR_FILE; do ${STR_SUDO}rm -Rf $STR_FILE; done
+	${STR_SUDO}find "$STR_TEST" -type f -name "._*" -o -name "*DS_Store*" -delete
+	${STR_SUDO}find "$STR_TEST" -type d -name ".fseventsd" -o -name ".Spotlight-V100" | while read STR_FILE; do ${STR_SUDO}rm -Rf "$STR_FILE"; done
 	return 0
 }
 
@@ -178,12 +178,12 @@ function file_add_line()
 		STR_SUDO="$(maybe_sudo)"
 	fi
 	if [ $4 ]; then
-		${STR_SUDO}cp -f $1 $1.bak > /dev/null 2>&1
+		${STR_SUDO}cp -f "$1" "$1.bak" > /dev/null 2>&1
 	fi
 	if [ "$(tail -c1 $1)" = "" ]; then
-		echo "$2" | ${STR_SUDO}tee -a $1 > /dev/null 2>&1
+		echo "$2" | ${STR_SUDO}tee -a "$1" > /dev/null 2>&1
 	else
-		${STR_SUDO}printf "\n$2" >> $1
+		${STR_SUDO}printf "\n$2" >> "$1"
 	fi
 	return 0
 }
@@ -266,12 +266,12 @@ function file_delete_line()
 	fi
     if [ "$(get_system)" = "Darwin" ]; then
     	if [ "$STR_BACKUP" = "" ]; then
-			${STR_SUDO}sed -i '' -E "/$(escape_slashes "$2")/d" $1
+			${STR_SUDO}sed -i '' -E "/$(escape_slashes "$2")/d" "$1"
 		else
-			${STR_SUDO}sed -i${STR_BACKUP} -E "/$(escape_slashes "$2")/d" $1
+			${STR_SUDO}sed -i${STR_BACKUP} -E "/$(escape_slashes "$2")/d" "$1"
 		fi
 	else
-		${STR_SUDO}sed -i${STR_BACKUP} -E "/$(escape_slashes "$2")/d" $1
+		${STR_SUDO}sed -i${STR_BACKUP} -E "/$(escape_slashes "$2")/d" "$1"
 	fi
 	if [ $BOOL_REGEX = true ]; then
 		if [ "$FILESIZE" = "$(get_file_size "$1")" ]; then
@@ -306,7 +306,7 @@ function file_replace_line()
 	if [ $5 ]; then
 		STR_BACKUP=" -i.bak"
 	fi
-	${STR_SUDO}perl -0777 -pi${STR_BACKUP} -e "s/^$(escape_slashes "$2")$/$(escape_slashes "$3")/msg" $1
+	${STR_SUDO}perl -0777 -pi${STR_BACKUP} -e "s/^$(escape_slashes "$2")$/$(escape_slashes "$3")/msg" "$1"
 	if [ $BOOL_REGEX = true ]; then
 		if [ "$FILESIZE" = "$(get_file_size "$1")" ]; then
 			return 1
@@ -340,7 +340,7 @@ function file_replace_line_first()
 	if [ $5 ]; then
 		STR_BACKUP=" -i.bak"
 	fi
-	${STR_SUDO}perl -0777 -pi${STR_BACKUP} -e "s/^$(escape_slashes "$2")$/$(escape_slashes "$3")/ms" $1
+	${STR_SUDO}perl -0777 -pi${STR_BACKUP} -e "s/^$(escape_slashes "$2")$/$(escape_slashes "$3")/ms" "$1"
 	if [ $BOOL_REGEX = true ]; then
 		if [ "$FILESIZE" = "$(get_file_size "$1")" ]; then
 			return 1
@@ -377,12 +377,12 @@ function file_replace_line_last()
 	fi
     if [ "$(get_system)" = "Darwin" ]; then
     	if [ "$STR_BACKUP" = "" ]; then
-			${STR_SUDO}sed -i '' -E "\$s/$(escape_slashes "$2")/$(escape_slashes "$3")/g" $1
+			${STR_SUDO}sed -i '' -E "\$s/$(escape_slashes "$2")/$(escape_slashes "$3")/g" "$1"
 		else
-			${STR_SUDO}sed -i${STR_BACKUP} -E "\$s/$(escape_slashes "$2")/$(escape_slashes "$3")/g" $1
+			${STR_SUDO}sed -i${STR_BACKUP} -E "\$s/$(escape_slashes "$2")/$(escape_slashes "$3")/g" "$1"
 		fi
 	else
-		${STR_SUDO}sed -i${STR_BACKUP} -E "\$s/$(escape_slashes "$2")/$(escape_slashes "$3")/g" $1
+		${STR_SUDO}sed -i${STR_BACKUP} -E "\$s/$(escape_slashes "$2")/$(escape_slashes "$3")/g" "$1"
 	fi
 	if [ $BOOL_REGEX = true ]; then
 		if [ "$FILESIZE" = "$(get_file_size "$1")" ]; then
@@ -624,7 +624,7 @@ function get_pidof()
 	if [ "$STR_TEST" = "" ]; then
 		STR_TEST="$(ps -A | grep "$1" | grep -v "grep $1" | awk '{print $1}')"
 	fi
-	if [ "$STR_TEST" = "" ]; then
+	if ! is_int "$STR_TEST"; then
 		return 1
 	fi
 	echo "$STR_TEST"
@@ -780,6 +780,55 @@ function is_which()
 	return 0
 }
 
+function kill_process()
+{
+	# PROCESS...
+	STR_TEST="$*"
+	if [ "$STR_TEST" = "" ]; then
+		return 1
+	fi
+	STR_SUDO="$(maybe_sudo)"
+	if is_which "killall"; then
+		${STR_SUDO}killall $STR_TEST > /dev/null 2>&1
+	else
+		ARR_TEST=()
+		IFS_OLD="$IFS"
+		IFS=" " read -r -a ARR_TEST <<< "$STR_TEST"
+		IFS="$IFS_OLD"
+		for STR in "${ARR_TEST[@]}"; do
+			INT_TEST="$(get_pidof "$STR")"
+			if [ ! "$INT_TEST" = "" ]; then
+				${STR_SUDO}kill $INT_TEST > /dev/null 2>&1
+			fi
+		done
+	fi
+	return 0
+}
+
+function kill_tmux()
+{
+	# SESSION... [SUDO]
+	if [ -z "$1" ]; then
+		return 1
+	fi
+	if ! is_which "tmux"; then
+		return 1
+	fi
+	STR_SUDO=""
+	if [ $2 ] && [ "$2" = "sudo" ]; then
+		STR_SUDO="$(maybe_sudo)"
+	fi
+	ARR_TEST=()
+	IFS_OLD="$IFS"
+	IFS=" " read -r -a ARR_TEST <<< "$1"
+	IFS="$IFS_OLD"
+	for STR in "${ARR_TEST[@]}"; do
+		STR="${STR%%.*}"
+		${STR_SUDO}tmux kill-ses -t $STR > /dev/null 2>&1
+	done
+	return 0
+}
+
 function maybe_apt_install()
 {
 	# APP [PACKAGE] [EXIT]
@@ -892,11 +941,11 @@ function maybe_tmux()
 		ARG_SESSION=""
 		# find existing session
 		if [ $2 ]; then
-			if [ ! "$(${STR_SUDO}tmux ls 2>&1 | grep $2:)" = "" ]; then
-				${STR_SUDO}tmux send-keys -t $2 "$(escape_quotes "$1")" C-m
+			ARG_SESSION="${2%%.*}"
+			if [ ! "$(${STR_SUDO}tmux ls 2>&1 | grep $ARG_SESSION:)" = "" ]; then
+				${STR_SUDO}tmux send-keys -t $ARG_SESSION "$(escape_quotes "$1")" C-m
 				return 0
 			fi
-			ARG_SESSION="$2"
 		fi
 		ARG_SUDO=""
 		if [ $3 ]; then
@@ -964,15 +1013,15 @@ function script_install()
 	if [ ! -f "$STR_FROM" ]; then
 		return 1
 	fi
-	chmod 644 $STR_FROM
-	chmod +x $STR_FROM
+	chmod 644 "$STR_FROM"
+	chmod +x "$STR_FROM"
 	if [ $2 ]; then
 		STR_SUDO=""
 		if [ $3 ] && [ "$3" = "sudo" ]; then
 			STR_SUDO="$(maybe_sudo)"
 		fi
-		${STR_SUDO}rm $2 > /dev/null 2>&1
-		${STR_SUDO}ln -s $STR_FROM $2
+		${STR_SUDO}rm "$2" > /dev/null 2>&1
+		${STR_SUDO}ln -s "$STR_FROM" "$2"
 	fi
 	return 0
 }
@@ -992,7 +1041,7 @@ function script_uninstall()
 		if [ $3 ] && [ "$3" = "sudo" ]; then
 			STR_SUDO="$(maybe_sudo)"
 		fi
-		${STR_SUDO}rm $2 > /dev/null 2>&1
+		${STR_SUDO}rm "$2" > /dev/null 2>&1
 	fi
 	return 0
 }
