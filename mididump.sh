@@ -40,8 +40,8 @@ if ! is_which "amidi"; then
 	exit 1
 fi
 if [ ! -d "$DIR_DATA" ]; then
-	mkdir -p $DIR_DATA
-	chmod $CHMOD_DIRS $DIR_DATA
+	mkdir -p "$DIR_DATA"
+	chmod $CHMOD_DIRS "$DIR_DATA"
 fi
 
 # vars
@@ -77,17 +77,17 @@ function mididump_start()
 	if is_process_running "amidi"; then
 		mididump_stop
 	else
-		echo > $FILE_MIDIDUMP
+		echo > "$FILE_MIDIDUMP"
 	fi
-	amidi -p $1 -d 2>&1 | grep --line-buffered " 01" | tee $FILE_MIDIDUMP
+	amidi -p $1 -d 2>&1 | grep --line-buffered " 01" | tee "$FILE_MIDIDUMP"
 	BOOL_CMD=true
 	return 0
 }
 
 function mididump_stop()
 {
-	${MAYBE_SUDO}killall amidi > /dev/null 2>&1
-	echo > $FILE_MIDIDUMP
+	kill_process "amidi"
+	echo > "$FILE_MIDIDUMP"
 	BOOL_CMD=false
 	return 0
 }

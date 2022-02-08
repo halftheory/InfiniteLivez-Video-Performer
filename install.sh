@@ -28,12 +28,12 @@ IFS_OLD="$IFS"
 IFS="," read -r -a ARR_TEST <<< "$LIST"
 IFS="$IFS_OLD"
 for FILE in "${ARR_TEST[@]}"; do
-	chmod $CHMOD_FILES $FILE
+	chmod $CHMOD_FILES "$FILE"
 	# skip
 	if [[ "$FILE" = *halftheory_functions* ]] || [[ "$FILE" = *halftheory_vars* ]]; then
 		continue
 	fi
-	chmod +x $FILE
+	chmod +x "$FILE"
 	if [[ "$FILE" = *install* ]] || [[ "$FILE" = *update* ]]; then
 		continue
 	fi

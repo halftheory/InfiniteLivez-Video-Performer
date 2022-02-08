@@ -21,9 +21,11 @@ if [ "$1" = "-install" ]; then
 	if script_install "$0" "$DIR_SCRIPTS/$SCRIPT_ALIAS" "sudo"; then
 		# depends
 		if has_arg "$*" "-depends"; then
-			maybe_apt_install "tmux"
 			maybe_apt_install "bc"
-			maybe_apt_install "ffplay" "ffmpeg"
+			maybe_apt_install "tmux"
+			${MAYBE_SUDO}apt-get -y install v4l-utils v4l-conf libv4l-dev
+			maybe_apt_install "ffmpeg"
+			maybe_apt_install "omxplayer"
 			# todo: usbmount
 		fi
 		echo "> Installed."
@@ -54,12 +56,12 @@ if is_process_running "$STR_PROCESS"; then
 	exit 1
 fi
 if [ ! -d "$DIR_DATA" ]; then
-	mkdir -p $DIR_DATA
-	chmod $CHMOD_DIRS $DIR_DATA
+	mkdir -p "$DIR_DATA"
+	chmod $CHMOD_DIRS "$DIR_DATA"
 fi
 if [ ! -d "$DIR_MEDIA" ]; then
-	mkdir -p $DIR_MEDIA
-	chmod $CHMOD_DIRS $DIR_MEDIA
+	mkdir -p "$DIR_MEDIA"
+	chmod $CHMOD_DIRS "$DIR_MEDIA"
 fi
 
 # vars
@@ -76,11 +78,19 @@ PLAY_MODE="$DEFAULT_PLAY_MODE"
 FILE_ORDER="$DEFAULT_FILE_ORDER"
 MIDI_PHRASE_LENGTH="$DEFAULT_MIDI_PHRASE_LENGTH"
 BPM="$DEFAULT_BPM"
-if [ -f "$FILE_SETTINGS" ]; then
-	. "$FILE_SETTINGS"
-else
-	echo > $FILE_SETTINGS
+# create settings
+if [ ! -f "$FILE_SETTINGS" ]; then
+	touch "$FILE_SETTINGS"
+	chmod $CHMOD_FILES "$FILE_SETTINGS"
+	STR_TEST="PLAY_MODE=$PLAY_MODE
+FILE_ORDER=$FILE_ORDER
+MIDI_PHRASE_LENGTH=$MIDI_PHRASE_LENGTH
+BPM=$BPM"
+	file_add_line "$FILE_SETTINGS" "$STR_TEST"
 fi
+# import settings
+. "$FILE_SETTINGS"
+
 CURRENT_MEDIA_RANDOM_INDEX=0
 CURRENT_MEDIA_ALPHABETICAL_INDEX=0
 BEAT=1
@@ -198,7 +208,7 @@ function update_placeholder()
 		random) STR_TEST="${ARR_MEDIA_RANDOM[$CURRENT_MEDIA_RANDOM_INDEX]}" ;;
 		*) STR_TEST="${ARR_MEDIA_ALPHABETICAL[$CURRENT_MEDIA_ALPHABETICAL_INDEX]}" ;;
 	esac
-	ln -sf $(quote_string_with_spaces "$STR_TEST") $(quote_string_with_spaces "$FILE_PLACEHOLDER") > /dev/null 2>&1
+	ln -sf "$STR_TEST" "$FILE_PLACEHOLDER" > /dev/null 2>&1
 	return 0
 }
 
@@ -229,12 +239,12 @@ shuffle_media
 
 # create playlist
 if [ ! -f "$FILE_PLAYLIST" ]; then
-	touch $FILE_PLAYLIST
-	chmod $CHMOD_FILES $FILE_PLAYLIST
+	touch "$FILE_PLAYLIST"
+	chmod $CHMOD_FILES "$FILE_PLAYLIST"
 	STR_TEST="ffconcat version 1.0
 file $(quote_string_with_spaces "$FILE_PLACEHOLDER")
 file $(quote_string_with_spaces "$FILE_PLACEHOLDER")"
-	file_add_line $FILE_PLAYLIST "$STR_TEST"
+	file_add_line "$FILE_PLAYLIST" "$STR_TEST"
 fi
 
 # create placeholder
@@ -248,7 +258,7 @@ STR_MIDIDUMP_SESSION="${STR_MIDIDUMP_SESSION%%.*}"
 if ! is_process_running "$(basename "$SH_MIDIDUMP")" && [ -f "$SH_MIDIDUMP" ]; then
 	maybe_tmux "$SH_MIDIDUMP" "$STR_MIDIDUMP_SESSION"
 	if ! is_process_running "$(basename "$SH_MIDIDUMP")"; then
-		rm $FILE_MIDIDUMP > /dev/null 2>&1
+		rm -f "$FILE_MIDIDUMP" > /dev/null 2>&1
 		echo "> Could not start '$(basename "$SH_MIDIDUMP")'. Removing $(basename "$FILE_MIDIDUMP")..."
 	fi
 fi
@@ -386,11 +396,8 @@ IFS="$IFS_OLD"
 if is_int "$PID_BEATS"; then
 	${MAYBE_SUDO}kill $PID_BEATS > /dev/null 2>&1
 fi
-tmux kill-ses -t $STR_PROCESS > /dev/null 2>&1
-tmux kill-ses -t $STR_MIDIDUMP_SESSION > /dev/null 2>&1
-${MAYBE_SUDO}killall $STR_PROCESS > /dev/null 2>&1
-${MAYBE_SUDO}killall $(basename "$SH_MIDIDUMP") > /dev/null 2>&1
-${MAYBE_SUDO}killall amidi > /dev/null 2>&1
+kill_tmux "$STR_PROCESS $STR_MIDIDUMP_SESSION"
+kill_process "$STR_PROCESS $(basename "$SH_MIDIDUMP") amidi"
 
 # shutdown
 if [ $BOOL_SHUTDOWN = true ] && [ ! "$(get_system)" = "Darwin" ]; then
