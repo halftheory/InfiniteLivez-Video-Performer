@@ -21,8 +21,10 @@ if [ "$1" = "-install" ]; then
 	if script_install "$0" "$DIR_SCRIPTS/$SCRIPT_ALIAS" "sudo"; then
 		# depends
 		if has_arg "$*" "-depends"; then
+			maybe_apt_install "tmux"
+			maybe_apt_install "bc"
 			maybe_apt_install "ffplay" "ffmpeg"
-			# usbmount
+			# todo: usbmount
 		fi
 		echo "> Installed."
 		exit 0
@@ -59,16 +61,11 @@ if [ ! -d "$DIR_MEDIA" ]; then
 	mkdir -p $DIR_MEDIA
 	chmod $CHMOD_DIRS $DIR_MEDIA
 fi
-HAS_SHUF=false
-if is_which "shuf"; then
-	HAS_SHUF=true
-fi
 
 # vars
 ARR_MEDIA_ALPHABETICAL=()
 ARR_MEDIA_RANDOM=()
 INT_BPM_INTERVAL=10
-BOOL_SHUTDOWN=false
 # vars - default
 DEFAULT_PLAY_MODE="midi"
 DEFAULT_FILE_ORDER="random"
@@ -207,34 +204,16 @@ function update_placeholder()
 
 function shuffle_media()
 {
-	# https://unix.stackexchange.com/questions/526723/bash-how-to-avoid-duplicate-result-from-random-list/526724
-	if [ $HAS_SHUF = true ]; then
-		ARR_MEDIA_RANDOM=($(shuf -e "${ARR_MEDIA_ALPHABETICAL[@]}"))
-	else
-		ARR_MEDIA_RANDOM=()
-		for INT_TEST in $(seq ${#ARR_MEDIA_ALPHABETICAL[@]} | sort -R); do
-			((INT_TEST--))
-			ARR_MEDIA_RANDOM+=("${ARR_MEDIA_ALPHABETICAL[$INT_TEST]}")
-		done
-	fi
+	ARR_MEDIA_RANDOM=()
+	for INT_TEST in $(seq ${#ARR_MEDIA_ALPHABETICAL[@]} | sort -R); do
+		((INT_TEST--))
+		ARR_MEDIA_RANDOM+=("${ARR_MEDIA_ALPHABETICAL[$INT_TEST]}")
+	done
 	CURRENT_MEDIA_RANDOM_INDEX=0
 	return 0
 }
 
-#function copy_video_files()
-# {
-	# avi divx dv flv gif m4v mov mp4 mpeg mpg ogv ts webm
-	# uppercase, lowercase extensions
-#}
-# check usb
-# usb found, checking total size of video files, check free space on /home minus DIR_MEDIA
-# prompt to continue
-#read -p "> Copy all video files from USB? [y]: " PROMPT_TEST
-#PROMPT_TEST="${PROMPT_TEST:-y}"
-#if [ "$PROMPT_TEST" = "y" ]; then
-#	rm $DIR_MEDIA/* > /dev/null 2>&1
-	# copy usb to $DIR_MEDIA
-#fi
+# todo: check usb
 
 # get file list
 delete_macos_system_files "$DIR_DATA"
@@ -264,20 +243,25 @@ if [ ! -e "$FILE_PLACEHOLDER" ]; then
 fi
 
 # start midi
+STR_MIDIDUMP_SESSION="$(basename "$SH_MIDIDUMP")"
+STR_MIDIDUMP_SESSION="${STR_MIDIDUMP_SESSION%%.*}"
 if ! is_process_running "$(basename "$SH_MIDIDUMP")" && [ -f "$SH_MIDIDUMP" ]; then
-	maybe_tmux "$SH_MIDIDUMP &" "$(basename "$SH_MIDIDUMP")"
+	maybe_tmux "$SH_MIDIDUMP" "$STR_MIDIDUMP_SESSION"
 	if ! is_process_running "$(basename "$SH_MIDIDUMP")"; then
 		rm $FILE_MIDIDUMP > /dev/null 2>&1
-		echo "> Could not start $(basename "$SH_MIDIDUMP"). Removing $(basename "$FILE_MIDIDUMP")..."
+		echo "> Could not start '$(basename "$SH_MIDIDUMP")'. Removing $(basename "$FILE_MIDIDUMP")..."
 	fi
 fi
 
-# play -nostdin To explicitly disable console interactions?
-trigger_beat "1"
-CMD_TEST="ffplay -hide_banner -v quiet -fs -an -sn -noborder -fast -framedrop -infbuf -fflags discardcorrupt -safe 0 -loop 0 -f concat -i $(quote_string_with_spaces "$FILE_PLAYLIST") &"
-eval "$CMD_TEST"
+# start video
+CMD_TEST="ffplay -hide_banner -v quiet -fs -an -sn -noborder -fast -framedrop -infbuf -fflags discardcorrupt -safe 0 -loop 0 -f concat -i $(quote_string_with_spaces "$FILE_PLAYLIST")"
+maybe_tmux "$CMD_TEST" "$STR_PROCESS"
+if ! is_process_running "$STR_PROCESS"; then
+	echo "> Could not start '$STR_PROCESS'. Exiting..."
+fi
 
 # read beats
+trigger_beat "1"
 while true; do
 	. "$FILE_SETTINGS"
 	case "$PLAY_MODE" in
@@ -297,6 +281,7 @@ while true; do
 done & PID_BEATS=$!
 
 # read keys
+BOOL_SHUTDOWN=false
 if [ "$(get_system)" = "Darwin" ]; then
 	INPUT_TIMEOUT="1"
 else
@@ -308,7 +293,7 @@ while true; do
 	read -rsn1 INPUT
 	KEY=""
 	case "$INPUT" in
-		q)
+		q|Q)
 			break
 			;;
 		$'\x1B')
@@ -320,7 +305,7 @@ while true; do
 	        	[D) KEY="LEFT" ;;
 	        	[2) KEY="INSERT" ;;
 	        	[3) KEY="DELETE" ;; # not perfect
-				*) KEY="ESC" ;;
+				*) KEY="ESC" ;; # also End
 	        esac
 			;;
 		"")
@@ -348,7 +333,7 @@ while true; do
 			esac
 			trigger_beat "1"
 			;;
-		UP)
+		UP|w)
 			case "$PLAY_MODE" in
 				# more beats
 				midi) update_settings "MIDI_PHRASE_LENGTH" "$(echo "$MIDI_PHRASE_LENGTH / 2" | bc -l)" ;;
@@ -356,7 +341,7 @@ while true; do
 				bpm) update_settings "BPM" "$(echo "$BPM + $INT_BPM_INTERVAL" | bc -l)" ;;
 			esac
 			;;
-		DOWN)
+		DOWN|s)
 			case "$PLAY_MODE" in
 				# less beats
 				midi) update_settings "MIDI_PHRASE_LENGTH" "$(echo "$MIDI_PHRASE_LENGTH * 2" | bc -l)" ;;
@@ -364,11 +349,11 @@ while true; do
 				bpm) update_settings "BPM" "$(echo "$BPM - $INT_BPM_INTERVAL" | bc -l)" ;;
 			esac
 			;;
-		LEFT)
+		LEFT|a)
 			# previous file
 			trigger_beat "1" "previous"
 			;;
-		RIGHT)
+		RIGHT|d)
 			# next file
 			trigger_beat "1"
 			;;
@@ -401,13 +386,16 @@ IFS="$IFS_OLD"
 if is_int "$PID_BEATS"; then
 	${MAYBE_SUDO}kill $PID_BEATS > /dev/null 2>&1
 fi
+tmux kill-ses -t $STR_PROCESS > /dev/null 2>&1
+tmux kill-ses -t $STR_MIDIDUMP_SESSION > /dev/null 2>&1
+${MAYBE_SUDO}killall $STR_PROCESS > /dev/null 2>&1
+${MAYBE_SUDO}killall $(basename "$SH_MIDIDUMP") > /dev/null 2>&1
+${MAYBE_SUDO}killall amidi > /dev/null 2>&1
 
 # shutdown
 if [ $BOOL_SHUTDOWN = true ] && [ ! "$(get_system)" = "Darwin" ]; then
-	${MAYBE_SUDO}killall $STR_PROCESS > /dev/null 2>&1
-	${MAYBE_SUDO}killall $(basename "$SH_MIDIDUMP") > /dev/null 2>&1
-	${MAYBE_SUDO}killall amidi > /dev/null 2>&1
-	sudo halt
+	echo "shutdown"
+	#sudo halt
 fi
 
 exit 0

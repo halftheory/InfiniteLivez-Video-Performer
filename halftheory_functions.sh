@@ -77,10 +77,8 @@ function delete_macos_system_files()
 	if [ $2 ] && [ "$2" = "sudo" ]; then
 		STR_SUDO="$(maybe_sudo)"
 	fi
-	${STR_SUDO}find $STR_TEST -type f -name "._*" -delete
-	${STR_SUDO}find $STR_TEST -type f -name "*DS_Store*" -delete
-	${STR_SUDO}find $STR_TEST -type d -name ".fseventsd" | while read STR_FILE; do ${STR_SUDO}rm -Rf $STR_FILE; done
-	${STR_SUDO}find $STR_TEST -type d -name ".Spotlight-V100" | while read STR_FILE; do ${STR_SUDO}rm -Rf $STR_FILE; done
+	${STR_SUDO}find $STR_TEST -type f -name "._*" -o -name "*DS_Store*" -delete
+	${STR_SUDO}find $STR_TEST -type d -name ".fseventsd" -o -name ".Spotlight-V100" | while read STR_FILE; do ${STR_SUDO}rm -Rf $STR_FILE; done
 	return 0
 }
 
@@ -619,11 +617,17 @@ function get_pidof()
 	if [ -z "$1" ]; then
 		return 1
 	fi
+	STR_TEST=""
 	if is_which "pidof"; then
-		echo "$(pidof "$1" | awk '{print $1}')"
-	else
-		echo "$(ps -A | grep "$1" | grep -v "grep $1" | awk '{print $1}')"
+		STR_TEST="$(pidof "$1" | awk '{print $1}')"
 	fi
+	if [ "$STR_TEST" = "" ]; then
+		STR_TEST="$(ps -A | grep "$1" | grep -v "grep $1" | awk '{print $1}')"
+	fi
+	if [ "$STR_TEST" = "" ]; then
+		return 1
+	fi
+	echo "$STR_TEST"
 	return 0
 }
 
