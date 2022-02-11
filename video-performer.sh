@@ -15,18 +15,32 @@ else
 fi
 
 SCRIPT_ALIAS="vp"
+if is_which "omxplayer"; then
+	STR_VIDEO_PLAYER="omxplayer"
+	STR_VIDEO_PROCESS="omxplayer.bin"
+else
+	STR_VIDEO_PLAYER="ffplay"
+	STR_VIDEO_PROCESS="ffplay"
+fi
 
 # install
 if [ "$1" = "-install" ]; then
 	if script_install "$0" "$DIR_SCRIPTS/$SCRIPT_ALIAS" "sudo"; then
 		# depends
 		if has_arg "$*" "-depends"; then
-			maybe_apt_install "bc"
+			${MAYBE_SUDO}apt-get -y install v4l-utils v4l-conf libv4l-dev bc
+			sleep 1
 			maybe_apt_install "tmux"
-			${MAYBE_SUDO}apt-get -y install v4l-utils v4l-conf libv4l-dev
-			maybe_apt_install "ffmpeg"
+			maybe_apt_install "ffplay" "ffmpeg"
 			maybe_apt_install "omxplayer"
-			# todo: usbmount
+		fi
+		file_add_line_config_after_all "avoid_warnings=1"
+		FILE_TEST="$DIR_LOCAL/.bashrc"
+		if [ -e "$FILE_TEST" ] && ! file_contains_line "$FILE_TEST" "alias 123=\"$SCRIPT_ALIAS\""; then
+			STR_TEST="alias 123=\"$SCRIPT_ALIAS\"
+alias 321=\"sudo halt\""
+			file_add_line "$FILE_TEST" "$STR_TEST"
+			source "$FILE_TEST"
 		fi
 		echo "> Installed."
 		exit 0
@@ -37,6 +51,11 @@ if [ "$1" = "-install" ]; then
 # uninstall
 elif [ "$1" = "-uninstall" ]; then
 	if script_uninstall "$0" "$DIR_SCRIPTS/$SCRIPT_ALIAS" "sudo"; then
+		FILE_TEST="$DIR_LOCAL/.bashrc"
+		if [ -e "$FILE_TEST" ]; then
+			file_delete_line "$FILE_TEST" "alias 123=\"$SCRIPT_ALIAS\""
+			file_delete_line "$FILE_TEST" "alias 321=\"sudo halt\""
+		fi
 		echo "> Uninstalled."
 		exit 0
 	else
@@ -46,29 +65,46 @@ elif [ "$1" = "-uninstall" ]; then
 fi
 
 # requirements
-STR_PROCESS="ffplay"
-if ! is_which "$STR_PROCESS"; then
-	echo "> '$STR_PROCESS' not found. Maybe you need to install it: $SCRIPT_ALIAS -install -depends"
+if ! is_which "$STR_VIDEO_PLAYER"; then
+	echo "> '$STR_VIDEO_PLAYER' not found. Maybe you need to install it: $SCRIPT_ALIAS -install -depends"
 	exit 1
 fi
-if is_process_running "$STR_PROCESS"; then
-	echo "> Process '$STR_PROCESS' is already running. Exiting..."
-	exit 1
+if is_process_running "$STR_VIDEO_PROCESS"; then
+	kill_process "$STR_VIDEO_PROCESS"
 fi
-if [ ! -d "$DIR_DATA" ]; then
-	mkdir -p "$DIR_DATA"
-	chmod $CHMOD_DIRS "$DIR_DATA"
+
+# vars - files
+DIR_WORKING="$DIRNAME/$SCRIPT_ALIAS"
+DIR_MEDIA="$DIR_WORKING/media"
+FILE_BEAT="$DIR_WORKING/beat.txt"
+FILE_MIDIDUMP="$DIR_WORKING/mididump.txt"
+FILE_OPERATION="$DIR_WORKING/operation.txt"
+FILE_SETTINGS="$DIR_WORKING/settings.txt"
+if [ ! -d "$DIR_WORKING" ]; then
+	mkdir -p "$DIR_WORKING"
+	chmod $CHMOD_DIRS "$DIR_WORKING"
 fi
 if [ ! -d "$DIR_MEDIA" ]; then
 	mkdir -p "$DIR_MEDIA"
 	chmod $CHMOD_DIRS "$DIR_MEDIA"
 fi
-
-# vars
-ARR_MEDIA_ALPHABETICAL=()
-ARR_MEDIA_RANDOM=()
-INT_BPM_INTERVAL=10
-# vars - default
+if [ ! -f "$FILE_BEAT" ]; then
+	touch "$FILE_BEAT"
+	chmod $CHMOD_FILES "$FILE_BEAT"
+fi
+if [ ! -f "$FILE_MIDIDUMP" ]; then
+	touch "$FILE_MIDIDUMP"
+	chmod $CHMOD_FILES "$FILE_MIDIDUMP"
+fi
+if [ ! -f "$FILE_OPERATION" ]; then
+	touch "$FILE_OPERATION"
+	chmod $CHMOD_FILES "$FILE_OPERATION"
+fi
+if [ ! -f "$FILE_SETTINGS" ]; then
+	touch "$FILE_SETTINGS"
+	chmod $CHMOD_FILES "$FILE_SETTINGS"
+fi
+# vars - defaults
 DEFAULT_PLAY_MODE="midi"
 DEFAULT_FILE_ORDER="random"
 DEFAULT_MIDI_PHRASE_LENGTH="4"
@@ -78,92 +114,122 @@ PLAY_MODE="$DEFAULT_PLAY_MODE"
 FILE_ORDER="$DEFAULT_FILE_ORDER"
 MIDI_PHRASE_LENGTH="$DEFAULT_MIDI_PHRASE_LENGTH"
 BPM="$DEFAULT_BPM"
-# create settings
-if [ ! -f "$FILE_SETTINGS" ]; then
-	touch "$FILE_SETTINGS"
-	chmod $CHMOD_FILES "$FILE_SETTINGS"
-	STR_TEST="PLAY_MODE=$PLAY_MODE
-FILE_ORDER=$FILE_ORDER
-MIDI_PHRASE_LENGTH=$MIDI_PHRASE_LENGTH
-BPM=$BPM"
-	file_add_line "$FILE_SETTINGS" "$STR_TEST"
-fi
-# import settings
-. "$FILE_SETTINGS"
-
-CURRENT_MEDIA_RANDOM_INDEX=0
-CURRENT_MEDIA_ALPHABETICAL_INDEX=0
+# vars - operation
+ARR_SESSIONS=()
+SESSIONS_COUNTER=0
+ARR_MEDIA_ALPHABETICAL=()
+MEDIA_ALPHABETICAL_INDEX=0
+ARR_MEDIA_RANDOM=()
+MEDIA_RANDOM_INDEX=0
+INT_BPM_INTERVAL=10
 BEAT=1
+ARR_PIDS=()
+BOOL_SHUTDOWN=false
 
-# functions
-function trigger_beat()
-{
-	# [INDEX] [PREVIOUS]
-	if [ $1 ] && is_int "$1"; then
-		BEAT=$1
+# get file list
+# 1. check usb
+STR_TEST="$(get_external_drives_csv)"
+if [ ! "$STR_TEST" = "" ]; then
+	echo "> External drives found. Looking for videos..."
+	ARR_EXTERNAL=()
+	IFS_OLD="$IFS"
+	IFS="," read -r -a ARR_EXTERNAL <<< "$STR_TEST"
+	IFS="$IFS_OLD"
+	LIST_EXTERNAL=""
+	for STR in "${ARR_EXTERNAL[@]}"; do
+		STR="$(get_file_list_video_csv "$STR")"
+		if [ ! "$STR" = "" ]; then
+			if [ "$LIST_EXTERNAL" = "" ]; then
+				LIST_EXTERNAL="$STR"
+			else
+				LIST_EXTERNAL="$LIST_EXTERNAL,$STR"
+			fi
+		fi
+	done
+	if [ ! "$LIST_EXTERNAL" = "" ]; then
+		# prompt
+		read -p "> Copy all video files from external drives? Note: All existing files will be deleted. [y]: " PROMPT_TEST
+		PROMPT_TEST="${PROMPT_TEST:-y}"
+		if [ "$PROMPT_TEST" = "y" ]; then
+			ARR_TEST=()
+			IFS_OLD="$IFS"
+			IFS="," read -r -a ARR_TEST <<< "${LIST_EXTERNAL%,}"
+			IFS="$IFS_OLD"
+			rm -f "$DIR_MEDIA"/* > /dev/null 2>&1
+			for STR in "${ARR_TEST[@]}"; do
+				cp -f "$STR" "$DIR_MEDIA" > /dev/null 2>&1
+				chmod $CHMOD_FILES "$DIR_MEDIA/$(basename "$STR")" > /dev/null 2>&1
+			done
+			echo "> Total of ${#ARR_TEST[@]} files copied to '$DIR_MEDIA'."
+			sleep 1
+		fi
 	else
-		. "$FILE_BEAT"
-		((BEAT++))
+		echo "> No videos found."
 	fi
-
-	# reset to 1?
-	if (($BEAT > 1)); then
-		case "$PLAY_MODE" in
-			midi) MAX="$MIDI_PHRASE_LENGTH" ;;
-			*) MAX="4" ;;
-		esac
-		if (($BEAT > $MAX)); then
-			BEAT=1
+	if is_which "eject"; then
+		for STR in "${ARR_EXTERNAL[@]}"; do
+			${MAYBE_SUDO}eject "$STR" > /dev/null 2>&1
+		done
+		echo "> External drives ejected."
+		sleep 1
+	fi
+fi
+# 2. check for files
+delete_macos_system_files "$DIR_WORKING"
+if ! dir_has_files "$DIR_MEDIA"; then
+	echo "> No files found in '$DIR_MEDIA'. Exiting..."
+	exit 1
+fi
+# 3. convert gifs
+ARR_TEST=()
+IFS_OLD="$IFS"
+IFS=$'\n'
+ARR_TEST=( $(find "$DIR_MEDIA" -type f -name "*.gif" -o -name "*.GIF") )
+IFS="$IFS_OLD"
+if [ ! "$ARR_TEST" = "" ]; then
+	# prompt
+	read -p "> Convert GIF files (${#ARR_TEST[@]}) to MP4? [y]: " PROMPT_TEST
+	PROMPT_TEST="${PROMPT_TEST:-y}"
+	if [ "$PROMPT_TEST" = "y" ]; then
+		if is_which "ffmpeg"; then
+			for STR in "${ARR_TEST[@]}"; do
+				STR_NEW="$DIR_MEDIA/$(get_filename "$STR").mp4"
+				ffmpeg -hide_banner -v quiet -y -i "$STR" -pix_fmt yuv420p -an -codec:v libx264 -preset veryslow -profile:v high -crf 1 "$STR_NEW" > /dev/null 2>&1
+				if [ $? -eq 0 ] && [ -f "$STR_NEW" ]; then
+					rm -f "$STR" > /dev/null 2>&1
+				fi
+			done
+		else
+			echo "> 'ffmpeg' not found. Maybe you need to install it: $SCRIPT_ALIAS -install -depends"
 		fi
 	fi
+fi
+# 4. check for videos
+IFS_OLD="$IFS"
+IFS="," read -r -a ARR_MEDIA_ALPHABETICAL <<< "$(get_file_list_video_csv "$DIR_MEDIA")"
+IFS="$IFS_OLD"
+if [ "$ARR_MEDIA_ALPHABETICAL" = "" ]; then
+	echo "> No video files found in '$DIR_MEDIA'. Exiting..."
+	exit 1
+fi
 
-	# change the file
-	if (($BEAT == 1)); then
-		case "$FILE_ORDER" in
-			random)
-				if [ $2 ] && [ "$2" = "previous" ]; then
-					((CURRENT_MEDIA_RANDOM_INDEX--))
-					if (($CURRENT_MEDIA_RANDOM_INDEX < 0)); then
-						CURRENT_MEDIA_RANDOM_INDEX=$((${#ARR_MEDIA_ALPHABETICAL[@]} - 1))
-					fi
-				else
-					((CURRENT_MEDIA_RANDOM_INDEX++))
-					if (($CURRENT_MEDIA_RANDOM_INDEX >= ${#ARR_MEDIA_ALPHABETICAL[@]})); then
-						CURRENT_MEDIA_RANDOM_INDEX=0
-					fi
-				fi
-				;;
-			*)
-				if [ $2 ] && [ "$2" = "previous" ]; then
-					((CURRENT_MEDIA_ALPHABETICAL_INDEX--))
-					if (($CURRENT_MEDIA_ALPHABETICAL_INDEX < 0)); then
-						CURRENT_MEDIA_ALPHABETICAL_INDEX=$((${#ARR_MEDIA_ALPHABETICAL[@]} - 1))
-					fi
-				else
-					((CURRENT_MEDIA_ALPHABETICAL_INDEX++))
-					if (($CURRENT_MEDIA_ALPHABETICAL_INDEX >= ${#ARR_MEDIA_ALPHABETICAL[@]})); then
-						CURRENT_MEDIA_ALPHABETICAL_INDEX=0
-					fi
-				fi
-			;;
-		esac
-		update_placeholder
-	fi
+clear
 
-	echo "BEAT $BEAT"
-	echo "BEAT=$BEAT" > $FILE_BEAT
-	return 0
-}
-
+# functions
 function update_settings()
 {
 	# KEY VALUE
-	if [ -z "$2" ]; then
+	if [ -z "$1" ]; then
 		return 1
 	fi
-	KEY="$1"
-	VALUE="$2"
-	BOOL_TEST=false
+	local KEY="$1"
+	local VALUE=""
+	if [ "$2" ]; then
+		VALUE="${@:2}"
+	fi
+	local BOOL_TEST=false
+	local MIN=""
+	local MAX=""
 	case "$KEY" in
 		PLAY_MODE)
 			PLAY_MODE="$VALUE"
@@ -192,148 +258,259 @@ function update_settings()
 			fi
 			;;
 	esac
-	if [ $BOOL_TEST = true ]; then
-		if ! file_contains_line "$FILE_SETTINGS" "$KEY=$VALUE"; then
-			if ! file_replace_line_first "$FILE_SETTINGS" "$KEY=(\w*)" "$KEY=$VALUE"; then
-				file_add_line "$FILE_SETTINGS" "$KEY=$VALUE"
-			fi
-		fi
+	# update file
+	if [ $BOOL_TEST = true ] && ! file_contains_line "$FILE_SETTINGS" "$KEY=$VALUE"; then
+		local STR_TEST="PLAY_MODE=$PLAY_MODE
+FILE_ORDER=$FILE_ORDER
+MIDI_PHRASE_LENGTH=$MIDI_PHRASE_LENGTH
+BPM=$BPM"
+		echo "$STR_TEST" > "$FILE_SETTINGS"
 	fi
 	return 0
 }
 
-function update_placeholder()
+function update_operation()
 {
-	case "$FILE_ORDER" in
-		random) STR_TEST="${ARR_MEDIA_RANDOM[$CURRENT_MEDIA_RANDOM_INDEX]}" ;;
-		*) STR_TEST="${ARR_MEDIA_ALPHABETICAL[$CURRENT_MEDIA_ALPHABETICAL_INDEX]}" ;;
+	# KEY VALUE
+	if [ -z "$1" ]; then
+		return 1
+	fi
+	local KEY="$1"
+	local VALUE=""
+	if [ "$2" ]; then
+		VALUE="${@:2}"
+	fi
+	local BOOL_TEST=false
+	case "$KEY" in
+		ARR_SESSIONS)
+			ARR_SESSIONS=()
+			if [ ! "$VALUE" = "" ]; then
+				local IFS_OLD="$IFS"
+				IFS=" " read -r -a ARR_SESSIONS <<< "$VALUE"
+				IFS="$IFS_OLD"
+			fi
+			VALUE="($VALUE)"
+			BOOL_TEST=true
+			;;
+		SESSIONS_COUNTER)
+			SESSIONS_COUNTER="$VALUE"
+			BOOL_TEST=true
+			;;
+		MEDIA_ALPHABETICAL_INDEX)
+			if (( $(echo "$VALUE < 0" | bc -l) )); then
+				VALUE="$(echo "${#ARR_MEDIA_ALPHABETICAL[@]} - 1" | bc -l)"
+			elif (( $(echo "$VALUE >= ${#ARR_MEDIA_ALPHABETICAL[@]}" | bc -l) )); then
+				VALUE=0
+			fi
+			MEDIA_ALPHABETICAL_INDEX="$VALUE"
+			BOOL_TEST=true
+			;;
+		MEDIA_RANDOM_INDEX)
+			if (( $(echo "$VALUE < 0" | bc -l) )); then
+				VALUE="$(echo "${#ARR_MEDIA_RANDOM[@]} - 1" | bc -l)"
+			elif (( $(echo "$VALUE >= ${#ARR_MEDIA_RANDOM[@]}" | bc -l) )); then
+				VALUE=0
+			fi
+			MEDIA_RANDOM_INDEX="$VALUE"
+			BOOL_TEST=true
+			;;
 	esac
-	ln -sf "$STR_TEST" "$FILE_PLACEHOLDER" > /dev/null 2>&1
+	# update file
+	if [ $BOOL_TEST = true ] && ! file_contains_line "$FILE_OPERATION" "$KEY=$VALUE"; then
+		local STR_TEST="ARR_SESSIONS=(${ARR_SESSIONS[@]})
+SESSIONS_COUNTER=$SESSIONS_COUNTER
+MEDIA_ALPHABETICAL_INDEX=$MEDIA_ALPHABETICAL_INDEX
+MEDIA_RANDOM_INDEX=$MEDIA_RANDOM_INDEX"
+		echo "$STR_TEST" > "$FILE_OPERATION"
+	fi
+	return 0
+}
+
+function trigger_beat()
+{
+	# [INDEX] [PREVIOUS]
+	. "$FILE_SETTINGS"
+	. "$FILE_OPERATION"
+	if [ $1 ] && is_int "$1"; then
+		BEAT=$1
+	else
+		. "$FILE_BEAT"
+		((BEAT++))
+	fi
+	# reset to 1?
+	if (($BEAT > 1)); then
+		local MAX="4"
+		case "$PLAY_MODE" in
+			midi) MAX="$MIDI_PHRASE_LENGTH" ;;
+			*) MAX="4" ;;
+		esac
+		if (($BEAT > $MAX)); then
+			BEAT=1
+		fi
+	fi
+	# change the file
+	if (($BEAT == 1)); then
+		case "$FILE_ORDER" in
+			random)
+				if [ $2 ] && [ "$2" = "previous" ]; then
+					((MEDIA_RANDOM_INDEX--))
+				else
+					((MEDIA_RANDOM_INDEX++))
+				fi
+				update_operation "MEDIA_RANDOM_INDEX" "$MEDIA_RANDOM_INDEX"
+				;;
+			*)
+				if [ $2 ] && [ "$2" = "previous" ]; then
+					((MEDIA_ALPHABETICAL_INDEX--))
+				else
+					((MEDIA_ALPHABETICAL_INDEX++))
+				fi
+				update_operation "MEDIA_ALPHABETICAL_INDEX" "$MEDIA_ALPHABETICAL_INDEX"
+			;;
+		esac
+		trigger_video &
+		local INT_TEST=$!
+		if is_int "$INT_TEST"; then
+			ARR_PIDS+=("$INT_TEST")
+		fi
+	fi
+	# update file
+	echo "BEAT=$BEAT" > "$FILE_BEAT"
+	return 0
+}
+
+function trigger_video()
+{
+	. "$FILE_SETTINGS"
+	. "$FILE_OPERATION"
+	local STR_TEST=""
+	case "$FILE_ORDER" in
+		random) STR_TEST="${ARR_MEDIA_RANDOM[$MEDIA_RANDOM_INDEX]}" ;;
+		*) STR_TEST="${ARR_MEDIA_ALPHABETICAL[$MEDIA_ALPHABETICAL_INDEX]}" ;;
+	esac
+	local CMD_TEST=""
+	case "$STR_VIDEO_PLAYER" in
+		ffplay)
+			CMD_TEST="$STR_VIDEO_PLAYER -hide_banner -v quiet -fs -an -sn -noborder -fast -framedrop -infbuf -fflags discardcorrupt -loop 0 $(quote_string_with_spaces "$STR_TEST")"
+			;;
+		omxplayer)
+			CMD_TEST="$STR_VIDEO_PLAYER -o local -b --no-osd --loop $(quote_string_with_spaces "$STR_TEST")"
+			;;
+	esac
+	# start new session
+	local STR_SESSION="$SCRIPT_ALIAS$SESSIONS_COUNTER"
+	kill_session "$STR_SESSION"
+	maybe_tmux "$CMD_TEST" "$STR_SESSION"
+	# kill old session
+	if [ ! "$ARR_SESSIONS" = "" ]; then
+		local BOOL_TEST=true
+		# omxplayer - allow extra sessions
+		if [ "$STR_VIDEO_PLAYER" = "omxplayer" ]; then
+			case "$PLAY_MODE" in
+				midi)
+					if [ "$MIDI_PHRASE_LENGTH" = "2" ] && ((${#ARR_SESSIONS[@]} < 2)); then
+						BOOL_TEST=false
+					elif [ "$MIDI_PHRASE_LENGTH" = "1" ] && ((${#ARR_SESSIONS[@]} < 3)); then
+						BOOL_TEST=false
+					fi
+					;;
+				bpm)
+					if (($BPM == 300)) && ((${#ARR_SESSIONS[@]} < 3)); then
+						BOOL_TEST=false
+					elif (($BPM >= 200)) && ((${#ARR_SESSIONS[@]} < 2)); then
+						BOOL_TEST=false
+					fi
+					;;
+			esac
+		fi
+		if [ $BOOL_TEST = true ]; then
+			sleep 0.5
+			local STR=""
+			local INT_TEST=0
+			for STR in "${ARR_SESSIONS[@]}"; do
+				kill_session "$STR"
+				unset -v "ARR_SESSIONS[$INT_TEST]"
+				((INT_TEST++))
+			done
+		fi
+	fi
+	ARR_SESSIONS+=("$STR_SESSION")
+	update_operation "ARR_SESSIONS" "${ARR_SESSIONS[@]}"
+	((SESSIONS_COUNTER++))
+	update_operation "SESSIONS_COUNTER" "$SESSIONS_COUNTER"
+	return 0
+}
+
+function kill_session()
+{
+	# SESSION
+	if [ -z "$1" ]; then
+		return 1
+	fi
+	tmux send-keys -t $1 "q" > /dev/null 2>&1
+	kill_tmux "$1"
 	return 0
 }
 
 function shuffle_media()
 {
 	ARR_MEDIA_RANDOM=()
+	local INT_TEST=""
 	for INT_TEST in $(seq ${#ARR_MEDIA_ALPHABETICAL[@]} | sort -R); do
 		((INT_TEST--))
 		ARR_MEDIA_RANDOM+=("${ARR_MEDIA_ALPHABETICAL[$INT_TEST]}")
 	done
-	CURRENT_MEDIA_RANDOM_INDEX=0
+	update_operation "MEDIA_RANDOM_INDEX" "0"
 	return 0
 }
-
-# todo: check usb
-
-# get file list
-delete_macos_system_files "$DIR_DATA"
-LIST="$(get_file_list_csv "$DIR_MEDIA")"
-IFS_OLD="$IFS"
-IFS="," read -r -a ARR_MEDIA_ALPHABETICAL <<< "$LIST"
-IFS="$IFS_OLD"
-if [ "$ARR_MEDIA_ALPHABETICAL" = "" ]; then
-	echo "> No files found in '$DIR_MEDIA'. Exiting..."
-	exit 1
-fi
 shuffle_media
 
-# create playlist
-if [ ! -f "$FILE_PLAYLIST" ]; then
-	touch "$FILE_PLAYLIST"
-	chmod $CHMOD_FILES "$FILE_PLAYLIST"
-	STR_TEST="ffconcat version 1.0
-file $(quote_string_with_spaces "$FILE_PLACEHOLDER")
-file $(quote_string_with_spaces "$FILE_PLACEHOLDER")"
-	file_add_line "$FILE_PLAYLIST" "$STR_TEST"
-fi
+# check settings
+. "$FILE_SETTINGS"
+update_settings "PLAY_MODE" "$PLAY_MODE"
+update_operation "ARR_SESSIONS"
 
-# create placeholder
-if [ ! -e "$FILE_PLACEHOLDER" ]; then
-	update_placeholder
+# start mididump
+if is_which "mididump"; then
+	kill_session "mididump"
+	kill_process "mididump amidi"
+	maybe_tmux "mididump \"$FILE_MIDIDUMP\"" "mididump"
 fi
-
-# start midi
-STR_MIDIDUMP_SESSION="$(basename "$SH_MIDIDUMP")"
-STR_MIDIDUMP_SESSION="${STR_MIDIDUMP_SESSION%%.*}"
-if ! is_process_running "$(basename "$SH_MIDIDUMP")" && [ -f "$SH_MIDIDUMP" ]; then
-	maybe_tmux "$SH_MIDIDUMP" "$STR_MIDIDUMP_SESSION"
-	if ! is_process_running "$(basename "$SH_MIDIDUMP")"; then
-		rm -f "$FILE_MIDIDUMP" > /dev/null 2>&1
-		echo "> Could not start '$(basename "$SH_MIDIDUMP")'. Removing $(basename "$FILE_MIDIDUMP")..."
-	fi
+if ! is_process_running "mididump"; then
+	rm -f "$FILE_MIDIDUMP" > /dev/null 2>&1
+	echo "> Could not start 'mididump'. Removing $(basename "$FILE_MIDIDUMP")..."
 fi
 
 # start video
-CMD_TEST="ffplay -hide_banner -v quiet -fs -an -sn -noborder -fast -framedrop -infbuf -fflags discardcorrupt -safe 0 -loop 0 -f concat -i $(quote_string_with_spaces "$FILE_PLAYLIST")"
-maybe_tmux "$CMD_TEST" "$STR_PROCESS"
-if ! is_process_running "$STR_PROCESS"; then
-	echo "> Could not start '$STR_PROCESS'. Exiting..."
-fi
-
-# read beats
 trigger_beat "1"
+
+# start loop - read beats
 while true; do
 	. "$FILE_SETTINGS"
 	case "$PLAY_MODE" in
 		midi)
 			if [ -f "$FILE_MIDIDUMP" ]; then
-			    if [ ! "$(tail $FILE_MIDIDUMP | tail -1 | xargs --null)" = "" ]; then
+			    if [ ! "$(tail "$FILE_MIDIDUMP" | tail -1 | xargs --null)" = "" ]; then
 			    	trigger_beat
-					echo "" > $FILE_MIDIDUMP
+					echo > "$FILE_MIDIDUMP"
 				fi
 			fi
 			;;
 		bpm)
-			sleep $(awk "BEGIN {print (60/$BPM)}")
 			trigger_beat
+			sleep $(awk "BEGIN {print (60/$BPM)}")
 			;;
 	esac
-done & PID_BEATS=$!
-
-# read keys
-BOOL_SHUTDOWN=false
-if [ "$(get_system)" = "Darwin" ]; then
-	INPUT_TIMEOUT="1"
-else
-	INPUT_TIMEOUT="0.01"
+done &
+INT_TEST=$!
+if is_int "$INT_TEST"; then
+	ARR_PIDS+=("$INT_TEST")
 fi
-IFS_OLD="$IFS"
-IFS=
-while true; do
-	read -rsn1 INPUT
-	KEY=""
-	case "$INPUT" in
-		q|Q)
-			break
-			;;
-		$'\x1B')
-			read -t $INPUT_TIMEOUT -rsn2 INPUT
-	        case "$INPUT" in
-	        	[A) KEY="UP" ;;
-	        	[B) KEY="DOWN" ;;
-	        	[C) KEY="RIGHT" ;;
-	        	[D) KEY="LEFT" ;;
-	        	[2) KEY="INSERT" ;;
-	        	[3) KEY="DELETE" ;; # not perfect
-				*) KEY="ESC" ;; # also End
-	        esac
-			;;
-		"")
-    		KEY="ENTER"
-			;;
-		" ")
-    		KEY="SPACE"
-			;;
-		*)
-    		KEY="$INPUT"
-			if [ "$(echo $KEY | xargs)" = "" ]; then
-				KEY="TAB"
-			fi
-			;;
-	esac
 
-    # trigger actions
-	case "$KEY" in
+# start loop - read keys
+while true; do
+	. "$FILE_SETTINGS"
+	case "$(read_keys)" in
 		ENTER)
 			case "$PLAY_MODE" in
 				# reset phrase
@@ -341,9 +518,19 @@ while true; do
 				# reset bpm
 				bpm) update_settings "BPM" "$DEFAULT_BPM" ;;
 			esac
+			# kill extra sessions
+			if [ ! "$ARR_SESSIONS" = "" ]; then
+				CMD_TEST="$(tmux ls 2>&1 | grep -E "$SCRIPT_ALIAS[0-9]+:" | grep -v "${ARR_SESSIONS[0]}" | awk '{print $1}')"
+			else
+				CMD_TEST="$(tmux ls 2>&1 | grep -E "$SCRIPT_ALIAS[0-9]+:" | awk '{print $1}')"
+			fi
+			for STR in "$CMD_TEST"; do
+				kill_session "${STR%%:*}"
+			done
+			update_operation "SESSIONS_COUNTER" "0"
 			trigger_beat "1"
 			;;
-		UP|w)
+		UP)
 			case "$PLAY_MODE" in
 				# more beats
 				midi) update_settings "MIDI_PHRASE_LENGTH" "$(echo "$MIDI_PHRASE_LENGTH / 2" | bc -l)" ;;
@@ -351,7 +538,7 @@ while true; do
 				bpm) update_settings "BPM" "$(echo "$BPM + $INT_BPM_INTERVAL" | bc -l)" ;;
 			esac
 			;;
-		DOWN|s)
+		DOWN)
 			case "$PLAY_MODE" in
 				# less beats
 				midi) update_settings "MIDI_PHRASE_LENGTH" "$(echo "$MIDI_PHRASE_LENGTH * 2" | bc -l)" ;;
@@ -359,11 +546,11 @@ while true; do
 				bpm) update_settings "BPM" "$(echo "$BPM - $INT_BPM_INTERVAL" | bc -l)" ;;
 			esac
 			;;
-		LEFT|a)
+		LEFT)
 			# previous file
 			trigger_beat "1" "previous"
 			;;
-		RIGHT|d)
+		RIGHT)
 			# next file
 			trigger_beat "1"
 			;;
@@ -379,30 +566,38 @@ while true; do
 				random) update_settings "FILE_ORDER" "alphabetical" ;;
 				*) update_settings "FILE_ORDER" "random" ;;
 			esac
-			update_placeholder
+			trigger_video &
+			INT_TEST=$!
+			if is_int "$INT_TEST"; then
+				ARR_PIDS+=("$INT_TEST")
+			fi
 			;;
 		b)
 			trigger_beat
+			;;
+		q)
+			break
 			;;
 		ESC)
 			BOOL_SHUTDOWN=true
 			break
 			;;
 	esac
-
 done
-IFS="$IFS_OLD"
 
-if is_int "$PID_BEATS"; then
-	${MAYBE_SUDO}kill $PID_BEATS > /dev/null 2>&1
+# stop
+if [ ! "$ARR_PIDS" = "" ]; then
+	${MAYBE_SUDO}kill ${ARR_PIDS[@]} > /dev/null 2>&1
 fi
-kill_tmux "$STR_PROCESS $STR_MIDIDUMP_SESSION"
-kill_process "$STR_PROCESS $(basename "$SH_MIDIDUMP") amidi"
+kill_session "mididump"
+for STR in "${ARR_SESSIONS[@]}"; do
+	kill_session "$STR"
+done
+kill_process "mididump amidi $STR_VIDEO_PROCESS"
 
 # shutdown
 if [ $BOOL_SHUTDOWN = true ] && [ ! "$(get_system)" = "Darwin" ]; then
-	echo "shutdown"
-	#sudo halt
+	echo "> Shutting down..."
 fi
 
 exit 0
