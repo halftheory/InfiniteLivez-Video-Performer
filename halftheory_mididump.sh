@@ -14,9 +14,16 @@ else
 	exit 1
 fi
 
+# vars
+SCRIPT_ALIAS="mididump"
+
+# usage
+if [ -z $1 ]; then
+	echo "> Usage: $SCRIPT_ALIAS [file]"
+	exit 1
 # install
-if [ "$1" = "-install" ]; then
-	if script_install "$0"; then
+elif [ "$1" = "-install" ]; then
+	if script_install "$0" "$DIR_SCRIPTS/$SCRIPT_ALIAS" "sudo"; then
 		echo "> Installed."
 		exit 0
 	else
@@ -25,7 +32,7 @@ if [ "$1" = "-install" ]; then
 	fi
 # uninstall
 elif [ "$1" = "-uninstall" ]; then
-	if script_uninstall "$0"; then
+	if script_uninstall "$0" "$DIR_SCRIPTS/$SCRIPT_ALIAS" "sudo"; then
 		echo "> Uninstalled."
 		exit 0
 	else
@@ -39,26 +46,35 @@ if ! is_which "amidi"; then
 	echo "> 'amidi' not found. Maybe you need to install it."
 	exit 1
 fi
-if [ ! -d "$DIR_DATA" ]; then
-	mkdir -p "$DIR_DATA"
-	chmod $CHMOD_DIRS "$DIR_DATA"
-fi
 
 # vars
 BOOL_CMD=false
+FILE_MIDIDUMP="$*"
+DIR_MIDIDUMP="$(dirname "$FILE_MIDIDUMP")"
+if [ ! "$DIR_MIDIDUMP" = "" ]; then
+	if [ ! -d "$DIR_MIDIDUMP" ]; then
+		mkdir -p "$DIR_MIDIDUMP"
+		chmod $CHMOD_DIRS "$DIR_MIDIDUMP"
+	fi
+fi
+if [ ! -f "$FILE_MIDIDUMP" ]; then
+	touch "$FILE_MIDIDUMP"
+	chmod $CHMOD_FILES "$FILE_MIDIDUMP"
+fi
 
 # functions
 function get_midi_port()
 {
-	STR_TEST="$(amidi -l | head -2)"
+	local STR_TEST="$(amidi -l | head -2)"
 	if [[ ! "$STR_TEST" = *"hw:"* ]]; then
 		return 1
 	fi
 	STR_TEST="$(echo $STR_TEST | tr "\n" " ")"
-	ARR_TEST=()
-	IFS_OLD="$IFS"
+	local ARR_TEST=()
+	local IFS_OLD="$IFS"
 	IFS=" " read -r -a ARR_TEST <<< "$STR_TEST"
 	IFS="$IFS_OLD"
+	local STR=""
 	for STR in "${ARR_TEST[@]}"; do
 		if [[ "$STR" = "hw:"* ]]; then
 			echo "$STR"
@@ -75,26 +91,36 @@ function mididump_start()
         return 1
     fi
 	if is_process_running "amidi"; then
-		mididump_stop
-	else
-		echo > "$FILE_MIDIDUMP"
+		kill_process "amidi"
 	fi
-	amidi -p $1 -d 2>&1 | grep --line-buffered " 01" | tee "$FILE_MIDIDUMP"
+	amidi -p $1 -d 2>&1 | grep --line-buffered " 01" | tee "$FILE_MIDIDUMP" > /dev/null &
 	BOOL_CMD=true
+	echo "> Listening on midi port '$1'."
 	return 0
 }
 
 function mididump_stop()
 {
 	kill_process "amidi"
-	echo > "$FILE_MIDIDUMP"
 	BOOL_CMD=false
+	echo "> Looking for midi ports..."
 	return 0
 }
 
+# start loop
+echo > "$FILE_MIDIDUMP"
+mididump_stop
 STR_MIDIPORT=""
 STR_MIDIPORT_NEW=""
-while true; do
+
+if [ -t 0 ]; then
+	STTY_OLD="$(stty -g)"
+	stty -echo -icanon -icrnl time 0 min 0
+fi
+KEY=""
+while [ ! "$KEY" = "q" ]; do
+	KEY="$(cat -v)"
+	# operation
 	STR_MIDIPORT_NEW="$(get_midi_port)"
 	if [ $BOOL_CMD = false ]; then
 		if [ ! "$STR_MIDIPORT_NEW" = "" ]; then
@@ -111,6 +137,10 @@ while true; do
 	fi
 	sleep 5
 done
+if [ -t 0 ]; then
+	stty "$STTY_OLD"
+fi
 
-mididump_stop
+mididump_stop > /dev/null 2>&1
+echo "> $SCRIPT_ALIAS stopped."
 exit 0

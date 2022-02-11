@@ -8,7 +8,7 @@ function check_remote_host()
 	if [ -z $1 ]; then
 		return 1
 	fi
-	CMD_TEST="$(ping -c1 $1 2>&1 | grep cannot)"
+	local CMD_TEST="$(ping -c1 $1 2>&1 | grep cannot)"
 	if [ ! "$CMD_TEST" = "" ]; then
 		return 1
 	fi
@@ -25,13 +25,13 @@ function cmd_ssh()
 	if [ -z $2 ]; then
 		return 1
 	fi
-	MY_HOST="$1"
-	MY_USER="$2"
-	MY_PASS=""
+	local MY_HOST="$1"
+	local MY_USER="$2"
+	local MY_PASS=""
 	if [ $3 ]; then
 		MY_PASS="$3"
 	fi
-	MY_PORT=""
+	local MY_PORT=""
 	if [ $4 ]; then
 		MY_PORT="$4"
 	fi
@@ -51,11 +51,11 @@ function cmd_tmux()
 	if [ -z "$1" ]; then
 		return 1
 	fi
-	STR_SESSION=""
+	local STR_SESSION=""
 	if [ $2 ]; then
 		STR_SESSION=" -s ${2%%.*}"
 	fi
-	STR_SUDO=""
+	local STR_SUDO=""
 	if [ $3 ] && [ "$3" = "sudo" ]; then
 		STR_SUDO="$(maybe_sudo)"
 	fi
@@ -69,16 +69,16 @@ function delete_macos_system_files()
 	if [ -z "$1" ]; then
 		return 1
 	fi
-	STR_TEST="$(get_realpath "$1")"
+	local STR_TEST="$(get_realpath "$1")"
 	if [ ! -d "$STR_TEST" ]; then
 		return 1
 	fi
-	STR_SUDO=""
+	local STR_SUDO=""
 	if [ $2 ] && [ "$2" = "sudo" ]; then
 		STR_SUDO="$(maybe_sudo)"
 	fi
-	${STR_SUDO}find "$STR_TEST" -type f -name "._*" -o -name "*DS_Store*" -delete
-	${STR_SUDO}find "$STR_TEST" -type d -name ".fseventsd" -o -name ".Spotlight-V100" | while read STR_FILE; do ${STR_SUDO}rm -Rf "$STR_FILE"; done
+	${STR_SUDO}find "$STR_TEST" -type f -name "._*" -o -name "*DS_Store*" -delete > /dev/null 2>&1
+	${STR_SUDO}find "$STR_TEST" -type d -name ".fseventsd" -o -name ".Spotlight-V100" | while read STR_FILE; do ${STR_SUDO}rm -Rf "$STR_FILE"; done > /dev/null 2>&1
 	return 0
 }
 
@@ -88,7 +88,7 @@ function dir_has_files()
 	if [ -z "$1" ]; then
 		return 1
 	fi
-	STR_TEST="$(get_realpath "$1")"
+	local STR_TEST="$(get_realpath "$1")"
 	if ! dir_not_empty "$STR_TEST"; then
 		return 1
 	fi
@@ -104,7 +104,7 @@ function dir_not_empty()
 	if [ -z "$1" ]; then
 		return 1
 	fi
-	STR_TEST="$(get_realpath "$1")"
+	local STR_TEST="$(get_realpath "$1")"
 	if [ ! -d "$STR_TEST" ]; then
 		return 1
 	fi
@@ -117,7 +117,7 @@ function dir_not_empty()
 function escape_quotes()
 {
 	# STRING
-	STR_TEST="$*"
+	local STR_TEST="$*"
 	if [[ "$STR_TEST" = *\"* ]]; then
 		STR_TEST="${STR_TEST//\"/\\\"}"
 	fi
@@ -128,7 +128,7 @@ function escape_quotes()
 function escape_slashes()
 {
 	# STRING
-	STR_TEST="$*"
+	local STR_TEST="$*"
 	if [[ "$STR_TEST" = */* ]]; then
 		STR_TEST="${STR_TEST//\//\\/}"
 	fi
@@ -139,7 +139,7 @@ function escape_slashes()
 function escape_spaces()
 {
 	# STRING
-	STR_TEST="$*"
+	local STR_TEST="$*"
 	if [[ "$STR_TEST" = *\ * ]]; then
 		STR_TEST="${STR_TEST// /\\ }"
 	fi
@@ -161,11 +161,11 @@ function file_add_line()
 	fi
 	# uncomment
 	if file_contains_line "$1" "#$2"; then
-		ARG_SUDO=""
+		local ARG_SUDO=""
 		if [ $3 ]; then
 			ARG_SUDO="$3"
 		fi
-		ARG_BACKUP=""
+		local ARG_BACKUP=""
 		if [ $4 ]; then
 			ARG_BACKUP="$4"
 		fi
@@ -173,14 +173,14 @@ function file_add_line()
 			return 0
 		fi
 	fi
-	STR_SUDO=""
+	local STR_SUDO=""
 	if [ $3 ] && [ "$3" = "sudo" ]; then
 		STR_SUDO="$(maybe_sudo)"
 	fi
 	if [ $4 ]; then
 		${STR_SUDO}cp -f "$1" "$1.bak" > /dev/null 2>&1
 	fi
-	if [ "$(tail -c1 $1)" = "" ]; then
+	if [ "$(tail -c1 "$1")" = "" ]; then
 		echo "$2" | ${STR_SUDO}tee -a "$1" > /dev/null 2>&1
 	else
 		${STR_SUDO}printf "\n$2" >> "$1"
@@ -200,11 +200,11 @@ function file_comment_line()
 	if ! file_contains_line "$1" "$2"; then
 		return 1
 	fi
-	ARG_SUDO=""
+	local ARG_SUDO=""
 	if [ $3 ]; then
 		ARG_SUDO="$3"
 	fi
-	ARG_BACKUP=""
+	local ARG_BACKUP=""
 	if [ $4 ]; then
 		ARG_BACKUP="$4"
 	fi
@@ -223,9 +223,10 @@ function file_contains_line()
 	if [ ! -e "$1" ]; then
 		return 1
 	fi
-	BOOL_TEST=false
-	IFS_OLD="$IFS"
+	local BOOL_TEST=false
+	local IFS_OLD="$IFS"
 	IFS="$(echo -en "\n\b")"
+	local STR=""
 	for STR in "$(grep -e "$2" "$1")"; do
 		if [ "$STR" = "$2" ]; then
 			BOOL_TEST=true
@@ -248,19 +249,19 @@ function file_delete_line()
     if [ ! -e "$1" ]; then
         return 1
     fi
-    BOOL_REGEX=false
+    local BOOL_REGEX=false
     if is_string_regex "$2"; then
     	BOOL_REGEX=true
-    	FILESIZE="$(get_file_size "$1")"
+    	local FILESIZE="$(get_file_size "$1")"
     fi
 	if [ $BOOL_REGEX = false ] && ! file_contains_line "$1" "$2"; then
 		return 1
 	fi
-	STR_SUDO=""
+	local STR_SUDO=""
 	if [ $3 ] && [ "$3" = "sudo" ]; then
 		STR_SUDO="$(maybe_sudo)"
 	fi
-	STR_BACKUP=""
+	local STR_BACKUP=""
 	if [ $4 ]; then
 		STR_BACKUP=".bak"
 	fi
@@ -290,19 +291,19 @@ function file_replace_line()
     if [ ! -e "$1" ]; then
         return 1
     fi
-    BOOL_REGEX=false
+    local BOOL_REGEX=false
     if is_string_regex "$2"; then
     	BOOL_REGEX=true
-    	FILESIZE="$(get_file_size "$1")"
+    	local FILESIZE="$(get_file_size "$1")"
     fi
 	if [ $BOOL_REGEX = false ] && ! file_contains_line "$1" "$2"; then
 		return 1
 	fi
-	STR_SUDO=""
+	local STR_SUDO=""
 	if [ $4 ] && [ "$4" = "sudo" ]; then
 		STR_SUDO="$(maybe_sudo)"
 	fi
-	STR_BACKUP=""
+	local STR_BACKUP=""
 	if [ $5 ]; then
 		STR_BACKUP=" -i.bak"
 	fi
@@ -324,19 +325,19 @@ function file_replace_line_first()
     if [ ! -e "$1" ]; then
         return 1
     fi
-    BOOL_REGEX=false
+    local BOOL_REGEX=false
     if is_string_regex "$2"; then
     	BOOL_REGEX=true
-    	FILESIZE="$(get_file_size "$1")"
+    	local FILESIZE="$(get_file_size "$1")"
     fi
 	if [ $BOOL_REGEX = false ] && ! file_contains_line "$1" "$2"; then
 		return 1
 	fi
-	STR_SUDO=""
+	local STR_SUDO=""
 	if [ $4 ] && [ "$4" = "sudo" ]; then
 		STR_SUDO="$(maybe_sudo)"
 	fi
-	STR_BACKUP=""
+	local STR_BACKUP=""
 	if [ $5 ]; then
 		STR_BACKUP=" -i.bak"
 	fi
@@ -359,19 +360,19 @@ function file_replace_line_last()
     if [ ! -e "$1" ]; then
         return 1
     fi
-    BOOL_REGEX=false
+    local BOOL_REGEX=false
     if [[ "$2" = *\(*\)* ]]; then
     	BOOL_REGEX=true
-    	FILESIZE="$(get_file_size "$1")"
+    	local FILESIZE="$(get_file_size "$1")"
     fi
 	if [ $BOOL_REGEX = false ] && ! file_contains_line "$1" "$2"; then
 		return 1
 	fi
-	STR_SUDO=""
+	local STR_SUDO=""
 	if [ $4 ] && [ "$4" = "sudo" ]; then
 		STR_SUDO="$(maybe_sudo)"
 	fi
-	STR_BACKUP=""
+	local STR_BACKUP=""
 	if [ $5 ]; then
 		STR_BACKUP=".bak"
 	fi
@@ -392,6 +393,60 @@ function file_replace_line_last()
 	return 0
 }
 
+function get_external_drives_csv()
+{
+	local ARR_FILES=()
+	local STR=""
+	if [ "$(get_system)" = "Darwin" ]; then
+		local STR_TEST="/Volumes"
+		local ARR_TEST=()
+		local IFS_OLD="$IFS"
+		IFS=$'\n'
+		ARR_TEST=( $(find "$STR_TEST" -maxdepth 1) )
+		IFS="$IFS_OLD"
+		if [ ! "$ARR_TEST" = "" ]; then
+			for STR in "${ARR_TEST[@]}"; do
+				if [ "$STR" = "$STR_TEST" ]; then
+					continue
+				fi
+				if [ ! "$(diskutil info $(basename "$STR") | grep External)" = "" ]; then
+					ARR_FILES+=("$STR")
+				fi
+			done
+		fi
+	else
+		if [ -e "/etc/mtab" ]; then
+			local STR_TEST="/media/usb"
+			local CMD_TEST="$(grep -e "$STR_TEST" "/etc/mtab" | tr "\n" " ")"
+			if [ ! "$CMD_TEST" = "" ]; then
+				local ARR_TEST=()
+				local IFS_OLD="$IFS"
+				IFS=" " read -r -a ARR_TEST <<< "$CMD_TEST"
+				IFS="$IFS_OLD"
+				for STR in "${ARR_TEST[@]}"; do
+					if [[ "$STR" = "$STR_TEST"* ]]; then
+						ARR_FILES+=("$STR")
+					fi
+				done
+			fi
+		fi
+	fi
+	if [ "$ARR_FILES" = "" ]; then
+		return 1
+	fi
+	# convert array to csv
+	local LIST=""
+	for STR in "${ARR_FILES[@]}"; do
+		if [ "$LIST" = "" ]; then
+			LIST="$STR"
+		else
+			LIST="$LIST,$STR"
+		fi
+	done
+	echo "${LIST%,}"
+	return 0
+}
+
 function get_file_grp()
 {
 	# FILE
@@ -402,9 +457,9 @@ function get_file_grp()
 		return 1
 	fi
 	if [ "$(get_system)" = "Darwin" ]; then
-		CMD_TEST="$(stat -Lf '%Sg' "$1")"
+		local CMD_TEST="$(stat -Lf '%Sg' "$1")"
 	else
-		CMD_TEST="$(stat -Lc %G "$1")"
+		local CMD_TEST="$(stat -Lc %G "$1")"
 	fi
 	if [ "$CMD_TEST" = "" ]; then
 		return 1
@@ -417,19 +472,21 @@ function get_file_list_csv()
 {
 	# DIR/FILES
 	# 1. split all by space.
-	ARR_TEST=()
-	IFS_OLD="$IFS"
+	local ARR_TEST=()
+	local IFS_OLD="$IFS"
 	IFS=" " read -r -a ARR_TEST <<< "$*"
 	IFS="$IFS_OLD"
 	if [ "$ARR_TEST" = "" ]; then
 		return 1
 	fi
 	# 2. find dirs and files containing spaces.
-	ARR_FILES=()
-	STR_TEST=""
+	local ARR_FILES=()
+	local STR_TEST=""
+	local STR_TEST2=""
+	local STR=""
+	local STR2=""
 	for STR in "${ARR_TEST[@]}"; do
 		if [ -d "$STR" ] && dir_has_files "$STR"; then
-			STR_TEST2=""
 			for STR2 in $(get_realpath "$STR")/*.*; do
 				if [ -e "$STR2" ] && [[ "$(basename "$STR2")" = *.* ]] && [ ! -d "$STR2" ]; then
 					ARR_FILES+=("$STR2")
@@ -466,7 +523,7 @@ function get_file_list_csv()
 		return 1
 	fi
 	# 4. convert array to csv
-	LIST=""
+	local LIST=""
 	for STR in "${ARR_FILES[@]}"; do
 		if [ "$LIST" = "" ]; then
 			LIST="$STR"
@@ -481,14 +538,15 @@ function get_file_list_csv()
 function get_file_list_quotes()
 {
 	# DIR/FILES
-	ARR_TEST=()
-	IFS_OLD="$IFS"
+	local ARR_TEST=()
+	local IFS_OLD="$IFS"
 	IFS="," read -r -a ARR_TEST <<< "$(get_file_list_csv "$*")"
 	IFS="$IFS_OLD"
 	if [ "$ARR_TEST" = "" ]; then
 		return 1
 	fi
-	LIST=""
+	local LIST=""
+	local STR=""
 	for STR in "${ARR_TEST[@]}"; do
 		if [ "$LIST" = "" ]; then
 			LIST="$(quote_string_with_spaces "$STR")"
@@ -497,6 +555,53 @@ function get_file_list_quotes()
 		fi
 	done
 	echo "${LIST% }"
+	return 0
+}
+
+function get_file_list_video_csv()
+{
+	# DIR
+	local STR_TEST="$*"
+	if [ "$STR_TEST" = "" ]; then
+		return 1
+	fi
+	STR_TEST="$(get_realpath "$STR_TEST")"
+	if [ ! -d "$STR_TEST" ]; then
+		return 1
+	fi
+	# 1. make the find command
+	local CMD_TEST=""
+	local ARR_TEST=("avi" "divx" "dv" "flv" "gif" "m4v" "mkv" "mov" "mp4" "mpeg" "mpg" "ogv" "ts" "webm")
+	local STR=""
+	for STR in "${ARR_TEST[@]}"; do
+		if [ "$CMD_TEST" = "" ]; then
+			CMD_TEST="-name \"*.$STR\""
+		else
+			CMD_TEST="$CMD_TEST -o -name \"*.$STR\""
+		fi
+		STR="$(echo "$STR" | tr '[:lower:]' '[:upper:]')"
+		CMD_TEST="$CMD_TEST -o -name \"*.$STR\""
+	done
+	CMD_TEST="find \"$STR_TEST\" -type f $CMD_TEST"
+	# 2. find files
+	local ARR_FILES=()
+	local IFS_OLD="$IFS"
+	IFS=$'\n'
+	ARR_FILES=( $(eval "$CMD_TEST") )
+	IFS="$IFS_OLD"
+	if [ "$ARR_FILES" = "" ]; then
+		return 1
+	fi
+	# 3. convert array to csv
+	local LIST=""
+	for STR in "${ARR_FILES[@]}"; do
+		if [ "$LIST" = "" ]; then
+			LIST="$STR"
+		else
+			LIST="$LIST,$STR"
+		fi
+	done
+	echo "${LIST%,}"
 	return 0
 }
 
@@ -510,9 +615,9 @@ function get_file_own()
 		return 1
 	fi
 	if [ "$(get_system)" = "Darwin" ]; then
-		CMD_TEST="$(stat -Lf '%Su' "$1")"
+		local CMD_TEST="$(stat -Lf '%Su' "$1")"
 	else
-		CMD_TEST="$(stat -Lc %U "$1")"
+		local CMD_TEST="$(stat -Lc %U "$1")"
 	fi
 	if [ "$CMD_TEST" = "" ]; then
 		return 1
@@ -531,9 +636,9 @@ function get_file_size()
 		return 1
 	fi
 	if [ "$(get_system)" = "Darwin" ]; then
-		CMD_TEST="$(stat -Lf '%z' "$1")"
+		local CMD_TEST="$(stat -Lf '%z' "$1")"
 	else
-		CMD_TEST="$(stat -Lc %s "$1")"
+		local CMD_TEST="$(stat -Lc %s "$1")"
 	fi
 	if [ "$CMD_TEST" = "" ]; then
 		return 1
@@ -542,9 +647,20 @@ function get_file_size()
 	return 0
 }
 
+function get_filename()
+{
+	# FILE
+	if [ -z "$1" ]; then
+		return 1
+	fi
+	local STR_TEST="$(basename "$*")"
+	echo "${STR_TEST%.*}"
+	return 0
+}
+
 function get_hostname()
 {
-	STR_TEST="localhost"
+	local STR_TEST="localhost"
 	if [ -e "/etc/hostname" ]; then
 		read -r STR_TEST < /etc/hostname
 	fi
@@ -555,7 +671,7 @@ function get_hostname()
 function get_macos_version()
 {
 	if is_which "sw_vers"; then
-		CMD_TEST="$(sw_vers | grep ProductVersion)"
+		local CMD_TEST="$(sw_vers | grep ProductVersion)"
 		if [ ! "$CMD_TEST" = "" ]; then
 			echo "$(trim_space "${CMD_TEST##*ProductVersion:}")"
 			return 0
@@ -567,12 +683,13 @@ function get_macos_version()
 function get_os_version()
 {
 	if [ -e "/etc/debian_version" ]; then
+		local STR_TEST=""
 		read -r STR_TEST < /etc/debian_version
 		echo "$(trim_space "$STR_TEST")"
 		return 0
 	fi
 	if [ -e "/etc/os-release" ]; then
-		CMD_TEST="$(grep -e "VERSION_ID=" /etc/os-release)"
+		local CMD_TEST="$(grep -e "VERSION_ID=" /etc/os-release)"
 		if [ ! "$CMD_TEST" = "" ]; then
 			CMD_TEST="${CMD_TEST##*VERSION_ID=\"}"
 			CMD_TEST="${CMD_TEST%\"}"
@@ -590,7 +707,7 @@ function get_os_version()
 function get_os_version_id()
 {
 	if [ -e "/etc/os-release" ]; then
-		CMD_TEST="$(grep -e "VERSION_ID=" /etc/os-release)"
+		local CMD_TEST="$(grep -e "VERSION_ID=" /etc/os-release)"
 		if [ ! "$CMD_TEST" = "" ]; then
 			CMD_TEST="${CMD_TEST##*VERSION_ID=\"}"
 			CMD_TEST="${CMD_TEST%\"}"
@@ -598,6 +715,7 @@ function get_os_version_id()
 			return 0
 		fi
 	fi
+	local STR_TEST=""
 	if [ -e "/etc/debian_version" ]; then
 		read -r STR_TEST < /etc/debian_version
 		echo "$(trim_space "${STR_TEST%%.*}")"
@@ -617,7 +735,7 @@ function get_pidof()
 	if [ -z "$1" ]; then
 		return 1
 	fi
-	STR_TEST=""
+	local STR_TEST=""
 	if is_which "pidof"; then
 		STR_TEST="$(pidof "$1" | awk '{print $1}')"
 	fi
@@ -634,14 +752,14 @@ function get_pidof()
 function get_realpath()
 {
 	# PATH
-	STR_TEST="$*"
+	local STR_TEST="$*"
 	if [ "$STR_TEST" = "" ]; then
 		return 1
 	fi
 	if is_which "realpath"; then
-		CMD_TEST="$(realpath -q "$STR_TEST")"
+		local CMD_TEST="$(realpath -q "$STR_TEST")"
 	else
-		CMD_TEST="$(readlink -n "$STR_TEST")"
+		local CMD_TEST="$(readlink -n "$STR_TEST")"
 	fi
 	if [ ! "$CMD_TEST" = "" ]; then
 		STR_TEST="$CMD_TEST"
@@ -655,8 +773,8 @@ function get_realpath()
 
 function get_system()
 {
-	STR_TEST="Linux"
-	CMD_TEST="$(uname -s)"
+	local STR_TEST="Linux"
+	local CMD_TEST="$(uname -s)"
 	if [ ! "$CMD_TEST" = "" ]; then
 		STR_TEST="$(trim_space "${CMD_TEST%% *}")"
 	fi
@@ -670,6 +788,7 @@ function get_user_dir()
 	if [ -z $1 ]; then
 		return 1
 	fi
+	local CMD_TEST=""
 	if is_which "getent"; then
 		CMD_TEST="$(getent passwd "$1" | cut -d: -f6)"
 		if [ ! "$CMD_TEST" = "" ]; then
@@ -701,13 +820,14 @@ function has_arg()
 	if [ -z "$2" ]; then
 		return 1
 	fi
-	ARR_TEST=()
-	IFS_OLD="$IFS"
+	local ARR_TEST=()
+	local IFS_OLD="$IFS"
 	IFS=" " read -r -a ARR_TEST <<< "$1"
 	IFS="$IFS_OLD"
 	if [ "$ARR_TEST" = "" ]; then
 		return 1
 	fi
+	local STR=""
 	for STR in "${ARR_TEST[@]}"; do
 		if [ "$STR" = "$2" ]; then
 			return 0
@@ -719,7 +839,7 @@ function has_arg()
 function is_int()
 {
 	# VALUE
-	if [ -z $1 ]; then
+	if [ -z "$1" ]; then
 		return 1
 	fi
 	if [ "$1" = "" ]; then
@@ -737,7 +857,7 @@ function is_process_running()
 	if [ -z $1 ]; then
 		return 1
 	fi
-	if [ "$(get_pidof "$1")" = "" ]; then
+	if ! is_int "$(get_pidof "$1")"; then
 		return 1
 	fi
 	return 0
@@ -746,7 +866,7 @@ function is_process_running()
 function is_string_regex()
 {
 	# STRING
-	STR_TEST="$*"
+	local STR_TEST="$*"
     if [[ "$STR_TEST" = *\(*\)* ]] || [[ "$STR_TEST" = *\[*\]* ]]; then
     	return 0
     fi
@@ -757,9 +877,9 @@ function is_sudo()
 {
 	# [USER]
 	if [ $1 ]; then
-		MY_USER="$1"
+		local MY_USER="$1"
 	else
-		MY_USER="$(whoami)"
+		local MY_USER="$(whoami)"
 	fi
 	if [ ! "$MY_USER" = "root" ]; then
 		return 1
@@ -773,7 +893,7 @@ function is_which()
 	if [ -z $1 ]; then
 		return 1
 	fi
-	CMD_TEST="$(which $1 2>&1 | grep $1)"
+	local CMD_TEST="$(which $1 2>&1 | grep $1)"
 	if [ "$CMD_TEST" = "" ] || [[ "$CMD_TEST" = *"not found"* ]]; then
 		return 1
 	fi
@@ -783,48 +903,46 @@ function is_which()
 function kill_process()
 {
 	# PROCESS...
-	STR_TEST="$*"
+	local STR_TEST="$*"
 	if [ "$STR_TEST" = "" ]; then
 		return 1
 	fi
-	STR_SUDO="$(maybe_sudo)"
-	if is_which "killall"; then
-		${STR_SUDO}killall $STR_TEST > /dev/null 2>&1
-	else
-		ARR_TEST=()
-		IFS_OLD="$IFS"
-		IFS=" " read -r -a ARR_TEST <<< "$STR_TEST"
-		IFS="$IFS_OLD"
-		for STR in "${ARR_TEST[@]}"; do
-			INT_TEST="$(get_pidof "$STR")"
-			if [ ! "$INT_TEST" = "" ]; then
-				${STR_SUDO}kill $INT_TEST > /dev/null 2>&1
+	local STR_SUDO="$(maybe_sudo)"
+	local ARR_TEST=()
+	local IFS_OLD="$IFS"
+	IFS=" " read -r -a ARR_TEST <<< "$STR_TEST"
+	IFS="$IFS_OLD"
+	local STR=""
+	for STR in "${ARR_TEST[@]}"; do
+		local INT_TEST="$(get_pidof "$STR")"
+		if is_int "$INT_TEST"; then
+			if is_which "killall"; then
+				${STR_SUDO}killall -9 $STR > /dev/null 2>&1
+			else
+				${STR_SUDO}kill -9 $INT_TEST > /dev/null 2>&1
 			fi
-		done
-	fi
+		fi
+	done
 	return 0
 }
 
 function kill_tmux()
 {
-	# SESSION... [SUDO]
+	# SESSION...
 	if [ -z "$1" ]; then
 		return 1
 	fi
 	if ! is_which "tmux"; then
 		return 1
 	fi
-	STR_SUDO=""
-	if [ $2 ] && [ "$2" = "sudo" ]; then
-		STR_SUDO="$(maybe_sudo)"
-	fi
-	ARR_TEST=()
-	IFS_OLD="$IFS"
-	IFS=" " read -r -a ARR_TEST <<< "$1"
+	local ARR_TEST=()
+	local IFS_OLD="$IFS"
+	IFS=" " read -r -a ARR_TEST <<< "$*"
 	IFS="$IFS_OLD"
+	local STR=""
 	for STR in "${ARR_TEST[@]}"; do
 		STR="${STR%%.*}"
-		${STR_SUDO}tmux kill-ses -t $STR > /dev/null 2>&1
+		tmux kill-ses -t $STR > /dev/null 2>&1
 	done
 	return 0
 }
@@ -835,20 +953,20 @@ function maybe_apt_install()
 	if [ -z $1 ]; then
 		return 1
 	fi
-	MY_APP="$1"
+	local MY_APP="$1"
 	if is_which "$MY_APP"; then
 		return 0
 	fi
-	MY_PACKAGE="$1"
+	local MY_PACKAGE="$1"
 	if [ $2 ]; then
 		MY_PACKAGE="$2"
 	fi
-	BOOL_EXIT=false
+	local BOOL_EXIT=false
 	if [ $3 ] && [ "$3" = "exit" ]; then
 		BOOL_EXIT=true
 	fi
     if [ ! "$(get_system)" = "Darwin" ]; then
-    	CMD_TEST="$(maybe_sudo)apt list --installed 2>&1 | grep \"$MY_PACKAGE/\""
+    	local CMD_TEST="$(maybe_sudo)apt list --installed 2>&1 | grep \"$MY_PACKAGE/\""
 		CMD_TEST="$(eval "$CMD_TEST")"
     	if [ "$CMD_TEST" = "" ]; then
 			$(maybe_sudo)apt-get -y install $MY_PACKAGE
@@ -872,15 +990,15 @@ function maybe_brew_install()
 	if [ -z $1 ]; then
 		return 1
 	fi
-	MY_APP="$1"
+	local MY_APP="$1"
 	if is_which "$MY_APP"; then
 		return 0
 	fi
-	MY_PACKAGE="$1"
+	local MY_PACKAGE="$1"
 	if [ $2 ]; then
 		MY_PACKAGE="$2"
 	fi
-	BOOL_EXIT=false
+	local BOOL_EXIT=false
 	if [ $3 ] && [ "$3" = "exit" ]; then
 		BOOL_EXIT=true
 	fi
@@ -916,9 +1034,9 @@ function maybe_sudo()
 {
 	# [USER]
 	if [ $1 ]; then
-		MY_USER="$1"
+		local MY_USER="$1"
 	else
-		MY_USER="$(whoami)"
+		local MY_USER="$(whoami)"
 	fi
 	if is_sudo "$MY_USER"; then
 		return 1
@@ -933,12 +1051,12 @@ function maybe_tmux()
 	if [ -z "$1" ]; then
 		return 1
 	fi
-	STR_SUDO=""
+	local STR_SUDO=""
 	if [ $3 ] && [ "$3" = "sudo" ]; then
 		STR_SUDO="$(maybe_sudo)"
 	fi
 	if is_which "tmux"; then
-		ARG_SESSION=""
+		local ARG_SESSION=""
 		# find existing session
 		if [ $2 ]; then
 			ARG_SESSION="${2%%.*}"
@@ -947,7 +1065,7 @@ function maybe_tmux()
 				return 0
 			fi
 		fi
-		ARG_SUDO=""
+		local ARG_SUDO=""
 		if [ $3 ]; then
 			ARG_SUDO="$3"
 		fi
@@ -974,28 +1092,78 @@ function quote_string_with_spaces()
 	return 0
 }
 
+function read_keys()
+{
+	# note: in while loops this will wait for user input.
+	local KEY=""
+	local INPUT=""
+	local INPUT_TIMEOUT="0.01"
+	if [ "$(get_system)" = "Darwin" ]; then
+		INPUT_TIMEOUT="0"
+	fi
+	local IFS_OLD="$IFS"
+	IFS=
+	read -rsn1 INPUT
+	case "$INPUT" in
+		$'\x1B')
+			read -t $INPUT_TIMEOUT -rsn3 INPUT
+	        case "$INPUT" in
+	        	[A) KEY="UP" ;;
+	        	[B) KEY="DOWN" ;;
+	        	[C) KEY="RIGHT" ;;
+	        	[D) KEY="LEFT" ;;
+				[1~) KEY="HOME" ;;
+	        	[2~) KEY="INSERT" ;;
+	        	[3~) KEY="DELETE" ;;
+	        	[4~) KEY="END" ;;
+	        	[5~) KEY="PAGEUP" ;;
+	        	[6~) KEY="PAGEDOWN" ;;
+				*) KEY="ESC" ;;
+	        esac
+			;;
+		"")
+    		KEY="ENTER"
+			;;
+		" ")
+    		KEY="SPACE"
+			;;
+		*)
+    		KEY="$INPUT"
+			if [ "$(echo $KEY | xargs)" = "" ]; then
+				KEY="TAB"
+			fi
+			;;
+	esac
+	IFS="$IFS_OLD"
+	if [ "$KEY" = "" ]; then
+		return 1
+	fi
+	echo "$KEY"
+	return 0
+}
+
 function remote_file_exists()
 {
 	# FILE HOST USER [PASS] [PORT]
 	if [ -z $3 ]; then
 		return 1
 	fi
-	MY_FILE="$1"
-	MY_HOST="$2"
-	MY_USER="$3"
-	MY_PASS=""
+	local MY_FILE="$1"
+	local MY_HOST="$2"
+	local MY_USER="$3"
+	local MY_PASS=""
 	if [ $4 ]; then
 		MY_PASS="$4"
 	fi
-	MY_PORT=""
+	local MY_PORT=""
 	if [ $5 ]; then
 		MY_PORT="$5"
 	fi
-	CMD_SSH="$(cmd_ssh "$MY_HOST" "$MY_USER" "$MY_PASS" "$MY_PORT")"
+	local CMD_SSH="$(cmd_ssh "$MY_HOST" "$MY_USER" "$MY_PASS" "$MY_PORT")"
 	if [ "$CMD_SSH" = "" ]; then
 		return 1
 	fi
-	CMD_TEST="$CMD_SSH \"ls $MY_FILE 2>&1 | grep 'No such file'\""
+	local CMD_TEST="$CMD_SSH \"ls $MY_FILE 2>&1 | grep 'No such file'\""
     CMD_TEST="$(eval "$CMD_TEST")"
 	if [ ! "$CMD_TEST" = "" ]; then
 		return 1
@@ -1009,14 +1177,14 @@ function script_install()
 	if [ -z $1 ]; then
 		return 1
 	fi
-	STR_FROM="$(get_realpath "$1")"
+	local STR_FROM="$(get_realpath "$1")"
 	if [ ! -f "$STR_FROM" ]; then
 		return 1
 	fi
 	chmod 644 "$STR_FROM"
 	chmod +x "$STR_FROM"
 	if [ $2 ]; then
-		STR_SUDO=""
+		local STR_SUDO=""
 		if [ $3 ] && [ "$3" = "sudo" ]; then
 			STR_SUDO="$(maybe_sudo)"
 		fi
@@ -1032,12 +1200,12 @@ function script_uninstall()
 	if [ -z $1 ]; then
 		return 1
 	fi
-	STR_FROM="$(get_realpath "$1")"
+	local STR_FROM="$(get_realpath "$1")"
 	if [ ! -f "$STR_FROM" ]; then
 		return 1
 	fi
 	if [ $2 ]; then
-		STR_SUDO=""
+		local STR_SUDO=""
 		if [ $3 ] && [ "$3" = "sudo" ]; then
 			STR_SUDO="$(maybe_sudo)"
 		fi
@@ -1049,7 +1217,7 @@ function script_uninstall()
 function trim_space()
 {
 	# STRING
-	STR_TEST="$*"
+	local STR_TEST="$*"
 	echo "$(echo $STR_TEST | xargs)"
 	return 0
 }

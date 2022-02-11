@@ -14,15 +14,12 @@ else
 	exit 1
 fi
 
-# prompt to continue
+# prompt
 read -p "> Continue update? [y]: " PROMPT_TEST
 PROMPT_TEST="${PROMPT_TEST:-y}"
 if [ ! "$PROMPT_TEST" = "y" ]; then
 	exit 0
 fi
-
-# vars
-DIRNAME="$(get_realpath "$DIRNAME")"
 
 # functions
 function scripts_install()
@@ -54,7 +51,7 @@ if [ -d "$DIRNAME/.git" ]; then
 	fi
 fi
 
-# curl
+# wget
 STR_REPO="$(basename "$DIRNAME")"
 if [ "$STR_REPO" = "" ]; then
 	exit 1
@@ -67,11 +64,11 @@ if maybe_apt_install "wget"; then
 		else
 			tar vxfz main.zip -C "$DIRNAME"
 		fi
-		if [ -d "$DIRNAME/$STR_REPO-main" ]; then
-			chmod $CHMOD_DIRS "$DIRNAME/$STR_REPO-main"
+		if [ -d "$DIRNAME/${STR_REPO}-main" ]; then
+			chmod $CHMOD_DIRS "$DIRNAME/${STR_REPO}-main"
 			scripts_uninstall
-			cp -Rf "$DIRNAME/$STR_REPO-main/*" "$DIRNAME/"
-			rm -Rf "$DIRNAME/$STR_REPO-main" > /dev/null 2>&1
+			cp -Rf "$DIRNAME/${STR_REPO}-main/*" "$DIRNAME/"
+			rm -Rf "$DIRNAME/${STR_REPO}-main" > /dev/null 2>&1
 			if scripts_install; then
 				echo "> Updated."
 			fi

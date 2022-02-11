@@ -15,10 +15,16 @@ else
 fi
 
 # vars
-DIRNAME="$(get_realpath "$DIRNAME")"
 STR_ARG="$(trim_space "$*")"
 if [ "$STR_ARG" = "" ]; then
 	STR_ARG="-install"
+fi
+
+# prompt
+read -p "> Continue install? ($STR_ARG) [y]: " PROMPT_TEST
+PROMPT_TEST="${PROMPT_TEST:-y}"
+if [ ! "$PROMPT_TEST" = "y" ]; then
+	exit 0
 fi
 
 # loop through *.sh
