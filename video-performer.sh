@@ -34,7 +34,6 @@ if [ "$1" = "-install" ]; then
 			maybe_apt_install "ffplay" "ffmpeg"
 			maybe_apt_install "omxplayer"
 		fi
-		file_add_line_config_after_all "avoid_warnings=1"
 		FILE_TEST="$DIR_LOCAL/.bashrc"
 		if [ -e "$FILE_TEST" ] && ! file_contains_line "$FILE_TEST" "alias 123=\"$SCRIPT_ALIAS\""; then
 			STR_TEST="alias 123=\"$SCRIPT_ALIAS\"
@@ -194,7 +193,7 @@ if [ ! "$ARR_TEST" = "" ]; then
 		if is_which "ffmpeg"; then
 			for STR in "${ARR_TEST[@]}"; do
 				STR_NEW="$DIR_MEDIA/$(get_filename "$STR").mp4"
-				ffmpeg -hide_banner -v quiet -y -i "$STR" -pix_fmt yuv420p -an -codec:v libx264 -preset veryslow -profile:v high -crf 1 "$STR_NEW" > /dev/null 2>&1
+				ffmpeg -hide_banner -v quiet -y -stream_loop 4 -i "$STR" -pix_fmt yuv420p -an -codec:v libx264 -preset veryslow -profile:v high -crf 1 "$STR_NEW" > /dev/null 2>&1
 				if [ $? -eq 0 ] && [ -f "$STR_NEW" ]; then
 					rm -f "$STR" > /dev/null 2>&1
 				fi
