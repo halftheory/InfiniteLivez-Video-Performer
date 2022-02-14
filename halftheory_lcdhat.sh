@@ -22,7 +22,7 @@ FILE_RETROGAME="retrogame"
 FILE_RETROGAME_CFG="$DIR_WORKING/$FILE_RETROGAME.cfg"
 
 # usage
-if [ -z $1 ]; then
+if [ -z $1 ] || [ "$1" = "-help" ]; then
 	echo "> Usage: $SCRIPT_ALIAS [on|off]"
 	exit 1
 # install
