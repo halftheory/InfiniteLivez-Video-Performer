@@ -77,7 +77,7 @@ function delete_macos_system_files()
 	if [ $2 ] && [ "$2" = "sudo" ]; then
 		STR_SUDO="$(maybe_sudo)"
 	fi
-	${STR_SUDO}find "$STR_TEST" -type f -name "._*" -o -name "*DS_Store*" -delete > /dev/null 2>&1
+	${STR_SUDO}find "$STR_TEST" -type f -name "._*" -o -name "*DS_Store*" | while read STR_FILE; do ${STR_SUDO}rm -f "$STR_FILE"; done > /dev/null 2>&1
 	${STR_SUDO}find "$STR_TEST" -type d -name ".fseventsd" -o -name ".Spotlight-V100" | while read STR_FILE; do ${STR_SUDO}rm -Rf "$STR_FILE"; done > /dev/null 2>&1
 	return 0
 }
@@ -602,6 +602,29 @@ function get_file_list_video_csv()
 		fi
 	done
 	echo "${LIST%,}"
+	return 0
+}
+
+function get_file_list_video_quotes()
+{
+	# DIR/FILES
+	local ARR_TEST=()
+	local IFS_OLD="$IFS"
+	IFS="," read -r -a ARR_TEST <<< "$(get_file_list_video_csv "$*")"
+	IFS="$IFS_OLD"
+	if [ "$ARR_TEST" = "" ]; then
+		return 1
+	fi
+	local LIST=""
+	local STR=""
+	for STR in "${ARR_TEST[@]}"; do
+		if [ "$LIST" = "" ]; then
+			LIST="$(quote_string_with_spaces "$STR")"
+		else
+			LIST="$LIST $(quote_string_with_spaces "$STR")"
+		fi
+	done
+	echo "${LIST% }"
 	return 0
 }
 

@@ -18,7 +18,7 @@ fi
 SCRIPT_ALIAS="mididump"
 
 # usage
-if [ -z $1 ] || [ "$1" = "-help" ]; then
+if [ "$1" = "-help" ]; then
 	echo "> Usage: $SCRIPT_ALIAS [file]"
 	exit 1
 # install
@@ -49,17 +49,24 @@ fi
 
 # vars
 BOOL_CMD=false
-FILE_MIDIDUMP="$*"
-DIR_MIDIDUMP="$(dirname "$FILE_MIDIDUMP")"
-if [ ! "$DIR_MIDIDUMP" = "" ]; then
-	if [ ! -d "$DIR_MIDIDUMP" ]; then
-		mkdir -p "$DIR_MIDIDUMP"
-		chmod $CHMOD_DIRS "$DIR_MIDIDUMP"
+HAS_FILE=false
+if [ $1 ]; then
+	FILE_MIDIDUMP="$*"
+	DIR_MIDIDUMP="$(dirname "$FILE_MIDIDUMP")"
+	if [ ! "$DIR_MIDIDUMP" = "" ]; then
+		if [ ! -d "$DIR_MIDIDUMP" ]; then
+			mkdir -p "$DIR_MIDIDUMP"
+			chmod $CHMOD_DIRS "$DIR_MIDIDUMP"
+		fi
 	fi
-fi
-if [ ! -f "$FILE_MIDIDUMP" ]; then
-	touch "$FILE_MIDIDUMP"
-	chmod $CHMOD_FILES "$FILE_MIDIDUMP"
+	if [ ! -f "$FILE_MIDIDUMP" ]; then
+		touch "$FILE_MIDIDUMP"
+		chmod $CHMOD_FILES "$FILE_MIDIDUMP"
+	fi
+	if [ -f "$FILE_MIDIDUMP" ]; then
+		echo > "$FILE_MIDIDUMP"
+		HAS_FILE=true
+	fi
 fi
 
 # functions
@@ -93,7 +100,11 @@ function mididump_start()
 	if is_process_running "amidi"; then
 		kill_process "amidi"
 	fi
-	amidi -p $1 -d 2>&1 | grep --line-buffered " 01" | tee "$FILE_MIDIDUMP" > /dev/null &
+	if [ $HAS_FILE = true ]; then
+		amidi -p $1 -d 2>&1 | grep --line-buffered " 01" | tee "$FILE_MIDIDUMP" > /dev/null &
+	else
+		amidi -p $1 -d 2>&1 | grep --line-buffered " 01"
+	fi
 	BOOL_CMD=true
 	echo "> Listening on midi port '$1'."
 	return 0
@@ -108,7 +119,6 @@ function mididump_stop()
 }
 
 # start loop
-echo > "$FILE_MIDIDUMP"
 mididump_stop
 STR_MIDIPORT=""
 STR_MIDIPORT_NEW=""
