@@ -7,17 +7,17 @@ These instructions describe the process of installing the application on a raspb
 - Terminal: `sudo touch /Volumes/boot/ssh`
 - Eject the card and put it in your raspberrypi.
 
-## 2. First boot
+## 2. First Boot
 - Connect all devices to your raspberrypi and power on. A screen is not needed at this stage.
 - Enable internet sharing on your machine: System Preferences > Sharing > Internet Sharing > From: Wi-Fi, To: Ethernet.
 - Terminal: `ssh pi@raspberrypi.local`
 - Password: `raspberry`
 
-## 3. Initial setup
+## 3. Initial Setup
 - Install git + tmux: `sudo apt-get -y install git tmux`
 - Install helper scripts:
 ```
-cd~
+cd ~
 git clone https://github.com/halftheory/sh-halftheory-pi
 cd sh-halftheory-pi
 chmod +x install.sh
@@ -25,18 +25,18 @@ chmod +x install.sh
 ```
 - Perform common optimizations: `optimize force`
   - When you reach the 'raspi-config' menu set: boot console auto-login, network wait off, keyboard localization, opengl driver legacy, gpu memory 256.
-- Note, new password: `pi`
-- Turn on/off common options:
+- Note the new easy password: `pi`
+- Turn on/off common features:
 ```
 config audio off
 config bluetooth off
 config hdmi on
 ```
 
-## 4. Application installation
-- Install the files:
+## 4. Application Install
+- Install the files and dependencies:
 ```
-cd~
+cd ~
 git clone https://github.com/halftheory/InfiniteLivez-Video-Performer
 cd InfiniteLivez-Video-Performer
 chmod +x install.sh
@@ -46,13 +46,13 @@ chmod +x install.sh
   - Q: Resize screen to LCD size? A: no.
 - Reboot: `sudo reboot`
 
-## 5. Application operation
-- Recommendation: if possible force connected displays to use 720p as the raspberrypi can have problems with high resolutions.
+## 5. Application Operation
+- Recommendation: If possible force connected displays to use 720p as the raspberrypi can have problems with high resolutions.
 - Start: `vp` or `123`(LCDHat)
 - Quit: `Esc` or `q` or hold together `123`(LCDHat)
 - Shutdown: `sudo halt` or `321`(LCDHat)
 
-## 6. Application update
+## 6. Application Update
 ```
 cd ~/InfiniteLivez-Video-Performer
 ./update.sh

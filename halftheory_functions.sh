@@ -1,7 +1,5 @@
 #!/bin/bash
 
-# functions
-
 function check_remote_host()
 {
 	# HOST
