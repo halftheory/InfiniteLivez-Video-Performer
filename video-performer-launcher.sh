@@ -214,19 +214,11 @@ if ! is_process_running "mididump"; then
 	echo "> Could not start 'mididump'. Removing $(basename "$FILE_MIDIDUMP")..."
 fi
 
-# start renicer
-if is_which "renicer"; then
-	kill_session "renicer"
-	kill_process "renicer"
-	maybe_tmux "renicer $STR_PROCESS persistent" "renicer"
-fi
-
 # start video
 eval "$FILE_PLAYER"
 
 # stop
-kill_session "mididump renicer"
-kill_process "mididump amidi renicer $STR_PROCESS"
-
-echo "> Shutting down..."
+echo "> Stopping..."
+kill_session "mididump"
+kill_process "mididump amidi $STR_PROCESS"
 exit 0

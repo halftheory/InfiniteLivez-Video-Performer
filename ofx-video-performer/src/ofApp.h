@@ -56,7 +56,7 @@ class ofApp : public ofBaseApp{
 
 		// video players.
 		#ifdef TARGET_RASPBERRY_PI
-			int videoPlayersMax = 10;
+			int videoPlayersMax = 5;
 		#else
 			int videoPlayersMax = 30;
 		#endif
