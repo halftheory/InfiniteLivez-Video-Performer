@@ -93,72 +93,78 @@ elif [ "$1" = "-install" ]; then
 			fi
 
 			# install driver
-			wget -q http://www.airspayce.com/mikem/bcm2835/bcm2835-1.71.tar.gz
-			if [ $? -eq 0 ] && [ -f "bcm2835-1.71.tar.gz" ]; then
-				tar vxfz bcm2835-1.71.tar.gz -C "$DIR_WORKING"
-				if [ -d "$DIR_WORKING/bcm2835-1.71" ]; then
-					chmod $CHMOD_DIRS "$DIR_WORKING/bcm2835-1.71"
-					(cd "$DIR_WORKING/bcm2835-1.71" && ${MAYBE_SUDO}./configure && ${MAYBE_SUDO}make && ${MAYBE_SUDO}make check && ${MAYBE_SUDO}make install)
+			if [ ! -d "$DIR_WORKING/bcm2835-1.71" ]; then
+				wget -q http://www.airspayce.com/mikem/bcm2835/bcm2835-1.71.tar.gz
+				if [ $? -eq 0 ] && [ -f "bcm2835-1.71.tar.gz" ]; then
+					tar vxfz bcm2835-1.71.tar.gz -C "$DIR_WORKING"
+					if [ -d "$DIR_WORKING/bcm2835-1.71" ]; then
+						chmod $CHMOD_DIRS "$DIR_WORKING/bcm2835-1.71"
+						(cd "$DIR_WORKING/bcm2835-1.71" && ${MAYBE_SUDO}./configure && ${MAYBE_SUDO}make && ${MAYBE_SUDO}make check && ${MAYBE_SUDO}make install)
+					fi
+					rm -f bcm2835-1.71.tar.gz > /dev/null 2>&1
+				else
+					echo "> Error: Could not install bcm2835."
+					exit 1
 				fi
-				rm -f bcm2835-1.71.tar.gz > /dev/null 2>&1
-			else
-				echo "> Error: Could not install bcm2835."
-				exit 1
 			fi
 
 			# install fbcp
-			wget -q https://www.waveshare.com/w/upload/f/f9/Waveshare_fbcp.7z
-			if [ $? -eq 0 ] && [ -f "Waveshare_fbcp.7z" ]; then
-				7z x Waveshare_fbcp.7z -o$DIR_WORKING/waveshare_fbcp
-				if [ -d "$DIR_WORKING/waveshare_fbcp" ]; then
-					chmod $CHMOD_DIRS "$DIR_WORKING/waveshare_fbcp"
-					mkdir -p "$DIR_WORKING/waveshare_fbcp/build"
-					chmod $CHMOD_DIRS "$DIR_WORKING/waveshare_fbcp/build"
-					(cd "$DIR_WORKING/waveshare_fbcp/build" && cmake -DSPI_BUS_CLOCK_DIVISOR=20 -DWAVESHARE_1INCH44_LCD_HAT=ON -DDISPLAY_BREAK_ASPECT_RATIO_WHEN_SCALING=ON -DSTATISTICS=0 .. && make -j)
+			if [ ! -d "$DIR_WORKING/waveshare_fbcp" ]; then
+				wget -q https://www.waveshare.com/w/upload/f/f9/Waveshare_fbcp.7z
+				if [ $? -eq 0 ] && [ -f "Waveshare_fbcp.7z" ]; then
+					7z x Waveshare_fbcp.7z -o$DIR_WORKING/waveshare_fbcp
+					if [ -d "$DIR_WORKING/waveshare_fbcp" ]; then
+						chmod $CHMOD_DIRS "$DIR_WORKING/waveshare_fbcp"
+						mkdir -p "$DIR_WORKING/waveshare_fbcp/build"
+						chmod $CHMOD_DIRS "$DIR_WORKING/waveshare_fbcp/build"
+						(cd "$DIR_WORKING/waveshare_fbcp/build" && cmake -DSPI_BUS_CLOCK_DIVISOR=20 -DWAVESHARE_1INCH44_LCD_HAT=ON -DDISPLAY_BREAK_ASPECT_RATIO_WHEN_SCALING=ON -DSTATISTICS=0 .. && make -j)
+					fi
+					rm -f Waveshare_fbcp.7z > /dev/null 2>&1
 				fi
-				rm -f Waveshare_fbcp.7z > /dev/null 2>&1
-			fi
-			if ! script_install "$DIR_WORKING/waveshare_fbcp/build/$FILE_FBCP" "$DIR_SCRIPTS/$FILE_FBCP" "sudo"; then
-				echo "> Error: Could not install $FILE_FBCP."
-				exit 1
+				if ! script_install "$DIR_WORKING/waveshare_fbcp/build/$FILE_FBCP" "$DIR_SCRIPTS/$FILE_FBCP" "sudo"; then
+					echo "> Error: Could not install $FILE_FBCP."
+					exit 1
+				fi
 			fi
 
 			# install retrogame
 			# https://raw.githubusercontent.com/adafruit/Raspberry-Pi-Installer-Scripts/master/retrogame.sh
 			# Download to tmpfile because might already be running
-			curl -f -s -o /tmp/$FILE_RETROGAME https://raw.githubusercontent.com/adafruit/Adafruit-Retrogame/master/retrogame
-			if [ $? -eq 0 ] && [ -f "/tmp/$FILE_RETROGAME" ]; then
-				mv /tmp/$FILE_RETROGAME "$DIR_WORKING"
-			fi
-			if ! script_install "$DIR_WORKING/$FILE_RETROGAME" "$DIR_SCRIPTS/$FILE_RETROGAME" "sudo"; then
-				echo "> Error: Could not install $FILE_RETROGAME."
-				exit 1
-			fi
-			FILE_TEST="/etc/udev/rules.d/10-retrogame.rules"
-			if [ ! -f "$FILE_TEST" ]; then
-				${MAYBE_SUDO}touch "$FILE_TEST"
-				${MAYBE_SUDO}chmod $CHMOD_FILES "$FILE_TEST"
-			fi
-			if ! file_add_line "$FILE_TEST" "SUBSYSTEM==\"input\", ATTRS{name}==\"retrogame\", ENV{ID_INPUT_KEYBOARD}=\"1\"" "sudo"; then
-				echo "> Error: Could not install $FILE_TEST."
-				exit 1
+			if [ ! -f "$DIR_WORKING/$FILE_RETROGAME" ]; then
+				curl -f -s -o /tmp/$FILE_RETROGAME https://raw.githubusercontent.com/adafruit/Adafruit-Retrogame/master/retrogame
+				if [ $? -eq 0 ] && [ -f "/tmp/$FILE_RETROGAME" ]; then
+					mv -f /tmp/$FILE_RETROGAME "$DIR_WORKING"
+				fi
+				if ! script_install "$DIR_WORKING/$FILE_RETROGAME" "$DIR_SCRIPTS/$FILE_RETROGAME" "sudo"; then
+					echo "> Error: Could not install $FILE_RETROGAME."
+					exit 1
+				fi
+				FILE_TEST="/etc/udev/rules.d/10-retrogame.rules"
+				if [ ! -f "$FILE_TEST" ]; then
+					${MAYBE_SUDO}touch "$FILE_TEST"
+					${MAYBE_SUDO}chmod $CHMOD_FILES "$FILE_TEST"
+				fi
+				if ! file_add_line "$FILE_TEST" "SUBSYSTEM==\"input\", ATTRS{name}==\"retrogame\", ENV{ID_INPUT_KEYBOARD}=\"1\"" "sudo"; then
+					echo "> Error: Could not install $FILE_TEST."
+					exit 1
+				fi
 			fi
 			if [ ! -f "$FILE_RETROGAME_CFG" ]; then
 				touch "$FILE_RETROGAME_CFG"
 				chmod $CHMOD_FILES "$FILE_RETROGAME_CFG"
-			fi
-			STR_TEST="UP 6
-DOWN 19
-LEFT 5
-RIGHT 26
-ENTER 13
-1 21
-2 20
-3 16
-ESC 21 20 16"
-			if ! file_add_line "$FILE_RETROGAME_CFG" "$STR_TEST"; then
-				echo "> Error: Could not install $FILE_RETROGAME_CFG."
-				exit 1
+				STR_TEST="UP 6
+	DOWN 19
+	LEFT 5
+	RIGHT 26
+	ENTER 13
+	1 21
+	2 20
+	3 16
+	ESC 21 20 16"
+				if ! file_add_line "$FILE_RETROGAME_CFG" "$STR_TEST"; then
+					echo "> Error: Could not install $FILE_RETROGAME_CFG."
+					exit 1
+				fi
 			fi
 		fi # /depends
 		echo "> Installed."

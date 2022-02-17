@@ -78,7 +78,7 @@ function delete_macos_system_files()
 		STR_SUDO="$(maybe_sudo)"
 	fi
 	${STR_SUDO}find "$STR_TEST" -type f -name "._*" -o -name "*DS_Store*" | while read STR_FILE; do ${STR_SUDO}rm -f "$STR_FILE"; done > /dev/null 2>&1
-	${STR_SUDO}find "$STR_TEST" -type d -name ".fseventsd" -o -name ".Spotlight-V100" | while read STR_FILE; do ${STR_SUDO}rm -Rf "$STR_FILE"; done > /dev/null 2>&1
+	${STR_SUDO}find "$STR_TEST" -type d -name ".fseventsd" -o -name ".Spotlight-V100" -o -name ".Trashes" | while read STR_FILE; do ${STR_SUDO}rm -Rf "$STR_FILE"; done > /dev/null 2>&1
 	return 0
 }
 
@@ -184,6 +184,7 @@ function file_add_line()
 		echo "$2" | ${STR_SUDO}tee -a "$1" > /dev/null 2>&1
 	else
 		${STR_SUDO}printf "\n$2" >> "$1"
+		# TODO: sudo won't work here. try echo -n?
 	fi
 	return 0
 }
@@ -1212,7 +1213,7 @@ function script_install()
 			STR_SUDO="$(maybe_sudo)"
 		fi
 		${STR_SUDO}rm "$2" > /dev/null 2>&1
-		${STR_SUDO}ln -s "$STR_FROM" "$2"
+		${STR_SUDO}ln -sf "$STR_FROM" "$2"
 	fi
 	return 0
 }
