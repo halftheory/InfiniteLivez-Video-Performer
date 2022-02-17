@@ -9,7 +9,7 @@ These instructions describe the process of installing the application on a raspb
 
 ## 2. First Boot
 - Connect all devices to your raspberrypi and power on. A screen is not needed at this stage.
-- Enable internet sharing on your machine: System Preferences > Sharing > Internet Sharing > From: Wi-Fi, To: Ethernet.
+- Enable internet sharing on your local machine: System Preferences > Sharing > Internet Sharing > From: Wi-Fi, To: Ethernet.
 - Terminal: `ssh pi@raspberrypi.local`
 - Password: `raspberry`
 
