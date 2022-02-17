@@ -20,11 +20,13 @@ if [ "$STR_ARG" = "" ]; then
 	STR_ARG="-install"
 fi
 
-# prompt
-read -p "> Continue install? ($STR_ARG) [y]: " PROMPT_TEST
-PROMPT_TEST="${PROMPT_TEST:-y}"
-if [ ! "$PROMPT_TEST" = "y" ]; then
-	exit 0
+if ! has_arg "$*" "-force"; then
+	# prompt
+	read -p "> Continue install? ($STR_ARG) [y]: " PROMPT_TEST
+	PROMPT_TEST="${PROMPT_TEST:-y}"
+	if [ ! "$PROMPT_TEST" = "y" ]; then
+		exit 0
+	fi
 fi
 
 # loop through *.sh
