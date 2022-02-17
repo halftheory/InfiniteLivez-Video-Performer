@@ -47,11 +47,13 @@ Esc<br/>q<br/>hold 123(LCDHat) | Quit.
 
 ## Update
 ```
+cd ~/InfiniteLivez-Video-Performer
 ./update.sh
 ```
 
 ## Uninstall
 ```
+cd ~/InfiniteLivez-Video-Performer
 ./install.sh -uninstall
 # or to delete all working files
 ./install.sh -uninstall -depends
