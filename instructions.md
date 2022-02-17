@@ -31,6 +31,7 @@ chmod +x install.sh
 config audio off
 config bluetooth off
 config hdmi on
+config overclock off
 ```
 
 ## 4. Application Install
