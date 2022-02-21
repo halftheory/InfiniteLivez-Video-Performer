@@ -178,12 +178,11 @@ function file_add_line()
 	if [ $4 ]; then
 		${STR_SUDO}cp -f "$1" "$1.bak" > /dev/null 2>&1
 	fi
-	if [ "$(tail -c1 "$1")" = "" ]; then
-		echo "$2" | ${STR_SUDO}tee -a "$1" > /dev/null 2>&1
-	else
-		${STR_SUDO}printf "\n$2" >> "$1"
-		# TODO: sudo won't work here. try echo -n?
+	if [ ! "$(tail -c1 "$1")" = "" ]; then
+		# needs new line
+		echo "" | ${STR_SUDO}tee -a "$1" > /dev/null 2>&1
 	fi
+	echo "$2" | ${STR_SUDO}tee -a "$1" > /dev/null 2>&1
 	return 0
 }
 
