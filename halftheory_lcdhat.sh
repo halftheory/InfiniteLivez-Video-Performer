@@ -153,14 +153,14 @@ elif [ "$1" = "-install" ]; then
 				touch "$FILE_RETROGAME_CFG"
 				chmod $CHMOD_FILES "$FILE_RETROGAME_CFG"
 				STR_TEST="UP 6
-	DOWN 19
-	LEFT 5
-	RIGHT 26
-	ENTER 13
-	1 21
-	2 20
-	3 16
-	ESC 21 20"
+DOWN 19
+LEFT 5
+RIGHT 26
+ENTER 13
+1 21
+2 20
+3 16
+ESC 21 20"
 				if ! file_add_line "$FILE_RETROGAME_CFG" "$STR_TEST"; then
 					echo "> Error: Could not install $FILE_RETROGAME_CFG."
 					exit 1
