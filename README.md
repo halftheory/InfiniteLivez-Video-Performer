@@ -66,3 +66,4 @@ cd ~/InfiniteLivez-Video-Performer
 
 ### Known Issues
 - The application will only recognize a USB keyboard *or* the LCDHat buttons, not both at the same time. To use the LCDHat buttons unplug the keyboard before launching.
+- The first video may not be scaled correctly in fullscreen mode. This is corrected when the video changes.
