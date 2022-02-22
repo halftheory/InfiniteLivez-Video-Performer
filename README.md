@@ -42,7 +42,7 @@ Up | Midi mode - shorten the change interval.<br/>BPM mode - increase the BPM.
 Down | Midi mode - lengthen the change interval.<br/>BPM mode - decrease the BPM.
 Enter | Midi mode - reset the change interval.<br/>BPM mode - reset the BPM.
 b | Trigger a 'beat'.
-Esc<br/>q<br/>hold 123(LCDHat) | Quit.
+Esc<br/>q<br/>hold 12(LCDHat) | Quit.
 `321`(LCDHat) | Shutdown.
 
 ## Update
