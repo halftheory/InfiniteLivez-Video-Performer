@@ -45,12 +45,13 @@ chmod +x install.sh
 ```
 - Turn on the [LCDHat](https://www.waveshare.com/wiki/1.44inch_LCD_HAT) if it's installed: `lcdhat on`
   - Q: Resize screen to LCD size? A: no.
+- To make the application run on startup: `crontab -e` and add the entry `@reboot /home/pi/InfiniteLivez-Video-Performer/video-performer-launcher.sh`
 - Reboot: `sudo reboot`
 
 ## 5. Application Operation
 - Recommendation: If possible force connected displays to use 720p as the raspberrypi can have problems with high resolutions.
 - Start: `vp` or `123`(LCDHat)
-- Quit: `Esc` or `q` or hold together `123`(LCDHat)
+- Quit: `Esc` or `q` or hold together `12`(LCDHat)
 - Shutdown: `sudo halt` or `321`(LCDHat)
 
 ## 6. Application Update
